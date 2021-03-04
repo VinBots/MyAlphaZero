@@ -15,6 +15,7 @@ class Play:
         name="game",
         policy_path1="ai_ckp.pth",
         policy_path2="ai_ckp.pth",
+        play_settings = None,
         visual=False,
     ):
         self.original_game = game
@@ -23,6 +24,7 @@ class Play:
         self.player2 = player2
         self.player = self.game.player
         self.end = False
+        self.play_settings = play_settings
         if visual:
             self.visual_play()
 
@@ -78,7 +80,7 @@ class Play:
             # first move from AI first
             succeed = False
             while not succeed:
-                loc = self.player1(self.game)
+                loc = self.player1(self.game, play_settings = self.play_settings)
                 succeed = self.game.move(loc)
 
             self.draw_move(loc)
@@ -91,9 +93,9 @@ class Play:
         while score is None:
             self.player = self.game.player
             if self.game.player == 1:
-                loc = self.player1(self.game)
+                loc = self.player1(self.game, play_settings = self.play_settings)
             else:
-                loc = self.player2(self.game)
+                loc = self.player2(self.game, play_settings = self.play_settings)
 
             success = self.game.move(loc)
 
@@ -146,9 +148,9 @@ class Play:
             self.player = self.game.player
             while not succeed:
                 if self.game.player == 1:
-                    loc = self.player1(self.game)
+                    loc = self.player1(self.game, play_settings = self.play_settings)
                 else:
-                    loc = self.player2(self.game)
+                    loc = self.player2(self.game, play_settings = self.play_settings)
                 succeed = self.game.move(loc)
 
             self.draw_move()

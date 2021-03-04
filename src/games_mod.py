@@ -88,7 +88,7 @@ class ConnectN:
         self.player = 1
         self.last_move = None
         self.n_moves = 0
-        self.switched_side = False
+        #self.switched_side = False
 
     # fast deepcopy
     def __copy__(self):
@@ -98,7 +98,7 @@ class ConnectN:
 
         new_game.N = self.N
         new_game.state = self.state.copy()
-        new_game.switched_side = self.switched_side
+        #new_game.switched_side = self.switched_side
         new_game.n_moves = self.n_moves
         new_game.last_move = self.last_move
         new_game.player = self.player
@@ -171,7 +171,7 @@ class ConnectN:
                 # make a move
                 self.state[i, j] = self.player
                 success = True
-                self.switched_side = True
+                #self.switched_side = True
                 success = True
 
         if success:
