@@ -1,5 +1,6 @@
 import time
 import numpy as np
+import random 
 
 import torch.optim as optim
 import torch
@@ -7,7 +8,9 @@ import progressbar as pb
 
 import mcts
 import games_mod
-
+from self_play import execute_self_play, fake_play
+from net_utils import plot_grad_flow
+from test1 import test_final_positions    
 
 class AlphaZeroTraining:
     """
@@ -24,147 +27,116 @@ class AlphaZeroTraining:
         self.policy = policy
         self.vterm = []
         self.logterm = []
-        self.print_every = 500  # print stats every x episods
+        self.print_every = 50  # print stats every x episods
         self.losses = []
         self.self_play_time = []
         self.training_time = []
         self.mcts_explore_time = []
         self.count_steps = []
-        self.training_pipeline()
 
-    def training_pipeline(self):
-        """TO DO"""
+    def training_pipeline(self, buffer):
+        """
+        Executes AlphaZero training algorithm
+        """
 
-        outcomes = []
-        losses = []
-        
-        self_play_time = []
-        training_time = []
-
-        max_episods = self.game_training_settings.episods
+        losses_list = []
+        episods = self.game_training_settings.episods
+        explore_steps = self.game_training_settings.explore_steps
         temp = 1.0
-
-        #widget = ["training loop: ", pb.Percentage(), " ", pb.Bar(), " ", pb.ETA()]
-        #timer = pb.ProgressBar(widgets=widget, maxval=max_episods).start()
-
-        for e in range(max_episods):
+        self_play_iterations = self.game_training_settings.self_play_iterations
+        batch_size = self.nn_training_settings.batch_size
+        
+        for ep in range (episods):    
+            for e in range(self_play_iterations):
+                if e > self.game_training_settings.temp_threshold[0]:
+                    temp = self.game_training_settings.temp_threshold[1]                    
+                new_exp = execute_self_play (self.game_settings, explore_steps, self.policy, temp)
+                #print (new_exp)
+                for i in range(len(new_exp)):                    
+                    new_aug_exp = self.data_augmentation(new_exp[i])
+                    buffer.add(new_aug_exp)
+                    
+            if buffer.buffer_len() == buffer.buffer_size:
+                losses, plt = self.policy.nn_train(buffer, batch_size)
+                losses_list.append(losses)
             
-            self.vterm = []
-            self.logterm = []
-
-            # self-play returns the outcome
-            if e > self.game_training_settings.temp_threshold[0]:
-                temp = self.game_training_settings.temp_threshold[1]
-            t0 = time.time()
-            outcome = self.self_play(temp)
-            t1 = time.time()
-            self_play_time.append(t1 - t0)
-
-            # the network is trained with the experience accumulated during self-play
-            t2 = time.time()
-            self.policy, loss = self.policy_training(outcome)
-            t3 = time.time()
-            training_time.append(t3 - t2)
-
-            outcomes.append(outcome)
-            losses.append(float(loss))
-            if (e + 1) % self.print_every == 0:
-                self.print_stats(e, losses, outcomes)
-
-            #timer.update(e + 1)
-
-        #timer.finish()
+            if (ep + 1) % self.print_every == 0 :
+                self.show_stats(ep, losses_list, plt, buffer)
+            
         self.policy.save_weights()
-        
-        self.losses = losses
-        self.self_play_time = self_play_time
-        self.training_time = training_time
-
-    def self_play(self, temp):
-        """
-        Starts with an empty board and runs MCTS for every node traversed.
-        Experiences are stored for the neural network to be trained.
-        """
-        count_steps = 0
-
-        mytree = mcts.Node(games_mod.ConnectN(self.game_settings))
-        mcts_explore_time = []
-
-        while mytree.outcome is None:
-            t4 = time.time()
-            for _ in range(self.game_training_settings.explore_steps):
-                mytree.explore(self.policy)
-            t5 = time.time()
-            mcts_explore_time.append(t5 - t4)
-            current_player = mytree.game.player
-            mytree, (v, nn_v, p, nn_p) = mytree.next(temperature = temp)
-            self.store_loss_term(current_player, v, nn_v, p, nn_p)
-            mytree.detach_mother()
-            outcome = mytree.outcome
-            count_steps+=1
-
-        mcts_explore_time_per_self_play = np.array(mcts_explore_time).mean()
-        self.mcts_explore_time.append(mcts_explore_time_per_self_play)
-        self.count_steps.append(count_steps)
-        return outcome
-
-    def store_loss_term(self, current_player, v, nn_v, p, nn_p):
-        """
-        Calculates the v term and log term of the loss function of 
-        the neural network
-        """
-
-        # compute prob * log pi
-        loglist = torch.log(nn_p) * p
-        # constant term to make sure if policy result = MCTS result, loss = 0
-        constant = torch.where(p > 0, p * torch.log(p), torch.tensor(0.0))
-
-        self.logterm.append(-torch.sum(loglist - constant))
-        self.vterm.append(nn_v * current_player)
-
-    def policy_training(self, outcome):
-        """
-        Calculates the loss function and applies gradient descent to minimize it
-        """
-
-        optimizer = optim.Adam(
-            self.policy.parameters(),
-            lr=self.nn_training_settings.lr,
-            weight_decay=self.nn_training_settings.weight_decay,
-        )
-
-        loss = torch.sum(
-            (torch.stack(self.vterm) - outcome) ** 2 + torch.stack(self.logterm)
-        )
-        loss_value = float(loss)
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        del loss
-        return (self.policy, loss_value)
-
-    def print_stats(self, e, losses, outcomes):
-        """
-        print statistics during the training process
-        """
-
-        print(
-            "game: ",
-            e + 1,
-            ", mean loss: {:3.2f}".format(np.mean(losses[-20:])),
-            ", Last 10 Results: ",
-            outcomes[-10:],
-        )
-
-    def get_losses(self):
-        """
-        Returns a list of losses by episod of self-play training
-        """
-        return self.losses
+        return losses_list
     
-    def get_time_stats(self):
-        """
-        Returns the statistics re. time measurements
-        """
+    def show_stats(self, ep, losses_list, plt, buffer):
+        print ("Loss - Moving average last 10 {}".format(
+            np.array(losses_list[-10:]).mean()))
+        print ("Loss - last 10 {}".format(
+            np.array(losses_list[-10:])))
+        print ("------------------------")
+        #plt = plot_grad_flow(self.policy.named_parameters())
+        #plt.savefig("nn_perf/gradients " + str(ep+1) + ".png")
+        #plt.show()
+        print ("------------------------")
         
-        return (self.self_play_time, self.training_time, self.mcts_explore_time, self.count_steps)
+        wins, losses, draws = buffer.dist_outcomes()
+        total_outcomes = wins + losses + draws
+        print ("Wins % : {:.2%}, Losses % : {:.2%}, Draws % : {:.2%}".format(
+            wins / total_outcomes, losses / total_outcomes, draws / total_outcomes))
+        test_final_positions(buffer)
+    
+    
+    def data_augmentation (self, exp):
+    
+        # for square board, add rotations as well
+        input_board, v, prob = exp
+        t, tinv = random.choice(self.transformations(half=False))
+        prob = prob.reshape(3,3)
+        return t(input_board), v, tinv(prob).reshape(1,9).squeeze(0)
+
+
+    def flip(self, x, dim):
+        
+        indices = [slice(None)] * x.dim()
+        indices[dim] = torch.arange(
+            x.size(dim) - 1, -1, -1, dtype=torch.long, device=x.device
+        )
+        return x[tuple(indices)]
+
+    def transformations (self, half=False):
+        """
+        Returns a list of transformation functions for exploiting symetries
+        """
+        # transformations
+        t0 = lambda x: x
+        t1 = lambda x: x[:, ::-1].copy()
+        t2 = lambda x: x[::-1, :].copy()
+        t3 = lambda x: x[::-1, ::-1].copy()
+        t4 = lambda x: x.T
+        #t5 = lambda x: x[:, ::-1].T.copy()
+        #t6 = lambda x: x[::-1, :].T.copy()
+        t7 = lambda x: x[::-1, ::-1].T.copy()
+
+        tlist = [t0, t1, t2, t3, t4, t7]
+        tlist_half = [t0, t1, t2, t3]
+
+        # inverse transformations
+        t0inv = lambda x: x
+        t1inv = lambda x: self.flip(x, 1)
+        t2inv = lambda x: self.flip(x, 0)
+        t3inv = lambda x: self.flip(self.flip(x, 0), 1)
+        t4inv = lambda x: x.t()
+        #t5inv = lambda x: self.flip(x, 0).t()
+        #t6inv = lambda x: self.flip(x, 1).t()
+        t7inv = lambda x: self.flip(self.flip(x, 0), 1).t()
+
+        if half:
+            tinvlist_half = [t0inv, t1inv, t2inv, t3inv]
+            transformation_list_half = list(zip(tlist_half, tinvlist_half))
+            return transformation_list_half
+
+        else:
+            tinvlist = [t0inv, t1inv, t2inv, t3inv, t4inv, t7inv]
+            transformation_list = list(zip(tlist, tinvlist))
+            return transformation_list
+    
+
+        

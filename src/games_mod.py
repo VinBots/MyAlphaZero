@@ -1,8 +1,10 @@
 import numpy as np
+import torch
 
 # output the index of when v has a continuous string of i
 # get_runs([0,0,1,1,1,0,0],1) gives [2],[5],[3]
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def get_runs(v, i):
     bounded = np.hstack(([0], (v == i).astype(int), [0]))
@@ -190,5 +192,13 @@ class ConnectN:
         indices = np.moveaxis(np.indices(self.state.shape), 0, -1)
         return indices[np.abs(self.state) != 1]
 
-    def available_mask(self):
-        return (np.abs(self.state) != 1).astype(np.uint8)
+    def available_mask(self, output_type = np.uint8):
+        return (np.abs(self.state) != 1).astype(output_type)
+    
+    def unmask(self, prob):
+        prob = np.array(prob)
+        all_prob = np.zeros(9)
+        mask = self.available_mask(output_type = np.bool_).flatten()
+        all_prob[mask] = prob
+        # TO DO: convert all operations in tensors
+        return torch.tensor(all_prob, dtype=torch.float, device=device)

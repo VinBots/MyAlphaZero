@@ -24,7 +24,21 @@ def policy_player_mcts(game, play_settings=None, policy_path="ai_ckp.pth"):
     mytree = mcts.Node(copy(game))
     for _ in range(explore_steps):
         mytree.explore(policy)
-    mytreenext, (v, nn_v, p, nn_p) = mytree.next(temperature=temperature)
+    mytreenext, (_, _, _,) = mytree.next(temperature=temperature)
+    return mytreenext.game.last_move
+
+
+def policy_player_pure_mcts(game, play_settings=None):
+    """to do"""
+
+    explore_steps = play_settings.explore_steps
+    temperature = play_settings.temperature
+        
+    policy = policy_mod.Policy()
+    mytree = mcts.Node(copy(game))
+    for _ in range(explore_steps):
+        mytree.explore(policy)
+    mytreenext, (_, _, _,) = mytree.next(temperature=temperature)
     return mytreenext.game.last_move
 
 
