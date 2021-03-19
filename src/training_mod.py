@@ -1,6 +1,6 @@
 import time
 import numpy as np
-import random 
+import random
 
 import torch.optim as optim
 import torch
@@ -10,11 +10,12 @@ import mcts
 import games_mod
 from self_play import execute_self_play, fake_play
 from net_utils import plot_grad_flow
-from test1 import test_final_positions    
+from test1 import test_final_positions
+
 
 class AlphaZeroTraining:
     """
-    Runs the AlphaZero training by launching episods of self-play 
+    Runs the AlphaZero training by launching episods of self-play
     and training a neural network after each self-play
     """
 
@@ -45,63 +46,68 @@ class AlphaZeroTraining:
         temp = 1.0
         self_play_iterations = self.game_training_settings.self_play_iterations
         batch_size = self.nn_training_settings.batch_size
-        
-        for ep in range (episods):    
+
+        for ep in range(episods):
             for e in range(self_play_iterations):
                 if e > self.game_training_settings.temp_threshold[0]:
-                    temp = self.game_training_settings.temp_threshold[1]                    
-                new_exp = execute_self_play (self.game_settings, explore_steps, self.policy, temp)
-                #print (new_exp)
-                for i in range(len(new_exp)):                    
+                    temp = self.game_training_settings.temp_threshold[1]
+                new_exp = execute_self_play(
+                    self.game_settings, explore_steps, self.policy, temp
+                )
+                # print (new_exp)
+                for i in range(len(new_exp)):
                     new_aug_exp = self.data_augmentation(new_exp[i])
                     buffer.add(new_aug_exp)
-                    
+
             if buffer.buffer_len() == buffer.buffer_size:
                 losses, plt = self.policy.nn_train(buffer, batch_size)
                 losses_list.append(losses)
-            
-            if (ep + 1) % self.print_every == 0 :
+
+            if (ep + 1) % self.print_every == 0:
                 self.show_stats(ep, losses_list, plt, buffer)
-            
+
         self.policy.save_weights()
         return losses_list
-    
+
     def show_stats(self, ep, losses_list, plt, buffer):
-        print ("Loss - Moving average last 10 {}".format(
-            np.array(losses_list[-10:]).mean()))
-        print ("Loss - last 10 {}".format(
-            np.array(losses_list[-10:])))
-        print ("------------------------")
-        #plt = plot_grad_flow(self.policy.named_parameters())
-        #plt.savefig("nn_perf/gradients " + str(ep+1) + ".png")
-        #plt.show()
-        print ("------------------------")
-        
+        print(
+            "Loss - Moving average last 10 {}".format(
+                np.array(losses_list[-10:]).mean()
+            )
+        )
+        print("Loss - last 10 {}".format(np.array(losses_list[-10:])))
+        print("------------------------")
+        # plt = plot_grad_flow(self.policy.named_parameters())
+        # plt.savefig("nn_perf/gradients " + str(ep+1) + ".png")
+        # plt.show()
+        print("------------------------")
+
         wins, losses, draws = buffer.dist_outcomes()
         total_outcomes = wins + losses + draws
-        print ("Wins % : {:.2%}, Losses % : {:.2%}, Draws % : {:.2%}".format(
-            wins / total_outcomes, losses / total_outcomes, draws / total_outcomes))
+        print(
+            "Wins % : {:.2%}, Losses % : {:.2%}, Draws % : {:.2%}".format(
+                wins / total_outcomes, losses / total_outcomes, draws / total_outcomes
+            )
+        )
         test_final_positions(buffer)
-    
-    
-    def data_augmentation (self, exp):
-    
+
+    def data_augmentation(self, exp):
+
         # for square board, add rotations as well
         input_board, v, prob = exp
         t, tinv = random.choice(self.transformations(half=False))
-        prob = prob.reshape(3,3)
-        return t(input_board), v, tinv(prob).reshape(1,9).squeeze(0)
-
+        prob = prob.reshape(3, 3)
+        return t(input_board), v, tinv(prob).reshape(1, 9).squeeze(0)
 
     def flip(self, x, dim):
-        
+
         indices = [slice(None)] * x.dim()
         indices[dim] = torch.arange(
             x.size(dim) - 1, -1, -1, dtype=torch.long, device=x.device
         )
         return x[tuple(indices)]
 
-    def transformations (self, half=False):
+    def transformations(self, half=False):
         """
         Returns a list of transformation functions for exploiting symetries
         """
@@ -111,8 +117,8 @@ class AlphaZeroTraining:
         t2 = lambda x: x[::-1, :].copy()
         t3 = lambda x: x[::-1, ::-1].copy()
         t4 = lambda x: x.T
-        #t5 = lambda x: x[:, ::-1].T.copy()
-        #t6 = lambda x: x[::-1, :].T.copy()
+        # t5 = lambda x: x[:, ::-1].T.copy()
+        # t6 = lambda x: x[::-1, :].T.copy()
         t7 = lambda x: x[::-1, ::-1].T.copy()
 
         tlist = [t0, t1, t2, t3, t4, t7]
@@ -124,8 +130,8 @@ class AlphaZeroTraining:
         t2inv = lambda x: self.flip(x, 0)
         t3inv = lambda x: self.flip(self.flip(x, 0), 1)
         t4inv = lambda x: x.t()
-        #t5inv = lambda x: self.flip(x, 0).t()
-        #t6inv = lambda x: self.flip(x, 1).t()
+        # t5inv = lambda x: self.flip(x, 0).t()
+        # t6inv = lambda x: self.flip(x, 1).t()
         t7inv = lambda x: self.flip(self.flip(x, 0), 1).t()
 
         if half:
@@ -137,6 +143,3 @@ class AlphaZeroTraining:
             tinvlist = [t0inv, t1inv, t2inv, t3inv, t4inv, t7inv]
             transformation_list = list(zip(tlist, tinvlist))
             return transformation_list
-    
-
-        

@@ -10,7 +10,7 @@ import games_mod
 
 class AlphaZeroTraining:
     """
-    Runs the AlphaZero training by launching episods of self-play 
+    Runs the AlphaZero training by launching episods of self-play
     and training a neural network after each self-play
     """
 
@@ -36,18 +36,18 @@ class AlphaZeroTraining:
 
         outcomes = []
         losses = []
-        
+
         self_play_time = []
         training_time = []
 
         max_episods = self.game_training_settings.episods
         temp = 1.0
 
-        #widget = ["training loop: ", pb.Percentage(), " ", pb.Bar(), " ", pb.ETA()]
-        #timer = pb.ProgressBar(widgets=widget, maxval=max_episods).start()
+        # widget = ["training loop: ", pb.Percentage(), " ", pb.Bar(), " ", pb.ETA()]
+        # timer = pb.ProgressBar(widgets=widget, maxval=max_episods).start()
 
         for e in range(max_episods):
-            
+
             self.vterm = []
             self.logterm = []
 
@@ -70,11 +70,11 @@ class AlphaZeroTraining:
             if (e + 1) % self.print_every == 0:
                 self.print_stats(e, losses, outcomes)
 
-            #timer.update(e + 1)
+            # timer.update(e + 1)
 
-        #timer.finish()
+        # timer.finish()
         self.policy.save_weights()
-        
+
         self.losses = losses
         self.self_play_time = self_play_time
         self.training_time = training_time
@@ -96,11 +96,11 @@ class AlphaZeroTraining:
             t5 = time.time()
             mcts_explore_time.append(t5 - t4)
             current_player = mytree.game.player
-            mytree, (v, nn_v, p, nn_p) = mytree.next(temperature = temp)
+            mytree, (v, nn_v, p, nn_p) = mytree.next(temperature=temp)
             self.store_loss_term(current_player, v, nn_v, p, nn_p)
             mytree.detach_mother()
             outcome = mytree.outcome
-            count_steps+=1
+            count_steps += 1
 
         mcts_explore_time_per_self_play = np.array(mcts_explore_time).mean()
         self.mcts_explore_time.append(mcts_explore_time_per_self_play)
@@ -109,7 +109,7 @@ class AlphaZeroTraining:
 
     def store_loss_term(self, current_player, v, nn_v, p, nn_p):
         """
-        Calculates the v term and log term of the loss function of 
+        Calculates the v term and log term of the loss function of
         the neural network
         """
 

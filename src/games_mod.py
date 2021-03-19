@@ -6,6 +6,7 @@ import torch
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+
 def get_runs(v, i):
     bounded = np.hstack(([0], (v == i).astype(int), [0]))
     difs = np.diff(bounded)
@@ -90,7 +91,7 @@ class ConnectN:
         self.player = 1
         self.last_move = None
         self.n_moves = 0
-        #self.switched_side = False
+        # self.switched_side = False
 
     # fast deepcopy
     def __copy__(self):
@@ -100,7 +101,7 @@ class ConnectN:
 
         new_game.N = self.N
         new_game.state = self.state.copy()
-        #new_game.switched_side = self.switched_side
+        # new_game.switched_side = self.switched_side
         new_game.n_moves = self.n_moves
         new_game.last_move = self.last_move
         new_game.player = self.player
@@ -173,7 +174,7 @@ class ConnectN:
                 # make a move
                 self.state[i, j] = self.player
                 success = True
-                #self.switched_side = True
+                # self.switched_side = True
                 success = True
 
         if success:
@@ -192,13 +193,13 @@ class ConnectN:
         indices = np.moveaxis(np.indices(self.state.shape), 0, -1)
         return indices[np.abs(self.state) != 1]
 
-    def available_mask(self, output_type = np.uint8):
+    def available_mask(self, output_type=np.uint8):
         return (np.abs(self.state) != 1).astype(output_type)
-    
+
     def unmask(self, prob):
         prob = np.array(prob)
         all_prob = np.zeros(9)
-        mask = self.available_mask(output_type = np.bool_).flatten()
+        mask = self.available_mask(output_type=np.bool_).flatten()
         all_prob[mask] = prob
         # TO DO: convert all operations in tensors
         return torch.tensor(all_prob, dtype=torch.float, device=device)

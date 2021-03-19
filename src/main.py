@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Game-related libraries
-import games_mod # Games
-import policy_mod # neural network
+import games_mod  # Games
+import policy_mod  # neural network
 from play_mod import Play
 import training_mod
 from game_utils import DotDict

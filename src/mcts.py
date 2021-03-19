@@ -74,22 +74,23 @@ def process_policy(policy, game):
 '''
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+
 class Node:
     """
     Implements the MCTS by building a search tree.
     A tree is made of several nodes connected between each other
     A node is defined by a game, a mother and a probability.
-    
+
     A node can have children, stored as a dictionary in self.child
     self.child = {action1: Node(game1, self, p1), action2: Node(game2, self, p2), ...}
     create_child() creates self.child by iterating over possible actions from a given node
     """
-    
+
     def __init__(self, game, mother=None, prob=torch.tensor(0.0, dtype=torch.float)):
         self.game = game
         self.child = {}
         self.U = 0
-        
+
         self.U_sa = 0
         self.Q_sa = 0
         self.W_sa = 0
@@ -112,7 +113,7 @@ class Node:
         """
         create_child() creates self.child by iterating over possible actions from a given node
         """
-        
+
         games = [copy(self.game) for a in actions]
         for action, game in zip(actions, games):
             game.move(action)
@@ -135,12 +136,12 @@ class Node:
             child = current.child
             max_U = max(c.U for c in child.values())
             actions = [a for a, c in child.items() if c.U == max_U]
-            
+
             if len(actions) == 0:
                 print("error zero length ", max_U)
                 print(current.game.state)
                 actions = [a for a, c in child.items()]
-            
+
             action = random.choice(actions)
             if max_U == -float("inf"):
                 current.U = float("inf")
@@ -157,25 +158,32 @@ class Node:
         if not current.child and current.outcome is None:
             # policy outputs results from the perspective of the next player
             # thus extra - sign is needed
-            #next_actions, probs, v = process_policy(policy, current.game)
-            #print (next_actions, probs, v)
-            
-            input = torch.tensor(current.game.state * current.game.player, 
-                                 dtype=torch.float, device=device).unsqueeze(0).unsqueeze(0)
-            
-            #next_actions, probs, v = process_policy(policy, current.game)
+            # next_actions, probs, v = process_policy(policy, current.game)
+            # print (next_actions, probs, v)
+
+            input = (
+                torch.tensor(
+                    current.game.state * current.game.player,
+                    dtype=torch.float,
+                    device=device,
+                )
+                .unsqueeze(0)
+                .unsqueeze(0)
+            )
+
+            # next_actions, probs, v = process_policy(policy, current.game)
 
             probs, v = policy(input)
-            mask = torch.tensor(current.game.available_mask())            
-            probs = probs[mask].view(-1)            
-            v = v.squeeze().squeeze()            
+            mask = torch.tensor(current.game.available_mask())
+            probs = probs[mask].view(-1)
+            v = v.squeeze().squeeze()
             next_actions = current.game.available_moves()
-            #print (next_actions, probs, v)
+            # print (next_actions, probs, v)
 
-            #print ("process_policy = {}".format((next_actions, probs, v)))
+            # print ("process_policy = {}".format((next_actions, probs, v)))
             current.nn_v = -v
             current.create_child(next_actions, probs)
-            current.V = -float(v)    
+            current.V = -float(v)
         current.N += 1
 
         # Updates U and back-prop
@@ -198,7 +206,7 @@ class Node:
         Plays an action according to stats collected in the explore stage
         """
         new_state = self.game.state
-        
+
         if self.game.score is not None:
             raise ValueError("game has ended with score {0:d}".format(self.game.score))
         if not self.child:
@@ -218,34 +226,32 @@ class Node:
         else:
             # use max for numerical stability
             totalN = max(node.N for node in child.values()) + 1
-            
-            #totalN = sum(node.N for node in child.values()) + 1
+
+            # totalN = sum(node.N for node in child.values()) + 1
             prob = torch.tensor(
                 [(node.N / totalN) for node in child.values()],
                 device=device,
-            )  
-            
+            )
+
             prob_choice = torch.tensor(
                 [(node.N / totalN) ** (1 / temperature) for node in child.values()],
                 device=device,
             )
-            
+
         self.normalize(prob, len(child))
         self.normalize(prob_choice, len(child))
 
         nn_prob = torch.stack([node.prob for node in child.values()]).to(device)
 
         nextstate = random.choices(list(child.values()), weights=prob_choice)[0]
-        #nextstate = random.choices(list(child.values()))[0]
-
+        # nextstate = random.choices(list(child.values()))[0]
 
         # V was for the previous player making a move
         # to convert to the current player we add - sign
-        
+
         prob = self.game.unmask(prob)
-        
+
         return nextstate, (new_state, -self.V, prob)
-        
 
     def normalize(self, prob, len_child):
         # normalize the probability
@@ -255,10 +261,9 @@ class Node:
         # if sum is zero, just make things random
         else:
             prob = torch.tensor(1.0 / len_child).repeat(len_child)
-        
-        return prob  
-    
-    
+
+        return prob
+
     def detach_mother(self):
         del self.mother
         self.mother = None
