@@ -33,7 +33,16 @@ class ReplayBuffer:
         Add a new experience to memory
         An experience is a namedtuple, made of a board state, v and p
         """
+        """
+        exp = self.experience(state=np.array([[-1.,  1., -1.],
+                                           [ 0.,  1.,  0.],
+                                           [ 0.,  0.,  0.]]), 
+                              v=1.0, 
+                              p=torch.tensor([ 0.,  0.,  0.,  0.,  0.,  0.,  0.,  1.,  0.]))
+        
+        """
         e = self.experience._make(exp)
+        # self.deduplicate(e)
         self.memory.append(e)
 
     def sample(self):
@@ -82,3 +91,41 @@ class ReplayBuffer:
             elif exp.v == 0:
                 draws += 1
         return (wins, losses, draws)
+
+    def deduplicate(self, exp):
+        idx, existing_state = self.find_exp(exp)
+        if idx is not None:
+            existing_exp = self.memory[idx]
+            exp = [
+                exp.state,
+                self.average_v(exp.v, existing_exp.v),
+                self.average_p(exp.p, existing_exp.p),
+            ]
+
+            e = self.experience._make(exp)
+            self.memory[idx] = e
+        else:
+            self.memory.append(exp)
+
+    def find_exp(self, new_exp):
+        # search = (index in buffer, namedtuple experience found)
+        idx = 0
+        found = False
+        for state, _, _ in self.memory:
+            new_exp_state = new_exp.state.astype(int)
+            existing_state = state.astype(int)
+
+            if np.array_equal(new_exp_state, existing_state):
+                found = True
+                break
+            idx += 1
+        if found:
+            return (idx, existing_state)
+        return (None, None)
+
+    def average_v(self, x1, x2):
+        return (x1 + x2) / 2
+
+    def average_p(self, a, b):
+        return (a + b) / 2
+        # return [(f + g) /2 for f,g in zip(a,b)]

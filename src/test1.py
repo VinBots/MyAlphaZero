@@ -19,17 +19,20 @@ def test_final_positions(buffer):
         if np.array_equal(state.astype(int), game_state2.astype(int)):
             count2 += 1
     print("Count test1: {}; test2 {}".format(count1, count2))
-    if count1 + count2 > 0:
-        frame = torch.tensor(game_state1, dtype=torch.float, device=device)
-        x1 = frame.unsqueeze(0).unsqueeze(0)
 
-        frame2 = torch.tensor(game_state2, dtype=torch.float, device=device)
-        x2 = frame2.unsqueeze(0).unsqueeze(0)
+    frame1 = torch.tensor(game_state1, dtype=torch.float, device=device).unsqueeze(0)
+    frame2 = torch.tensor(game_state2, dtype=torch.float, device=device).unsqueeze(0)
 
-        policy_path = "ai_ckp.pth"
-        policy = policy_mod.Policy()
-        policy.load_weights(policy_path)
-        p, v = policy(x1)
-        print("Probability = {}, v = {}".format(p, v))
-        p, v = policy(x2)
-        print("Probability = {}, v = {}".format(p, v))
+    policy_path = "ai_ckp.pth"
+    policy = policy_mod.Policy()
+    policy.load_weights(policy_path)
+
+    new_tensor = torch.stack((frame1, frame2))
+    v, p = policy.forward_batch(new_tensor)
+    v1 = v.detach().numpy()[0][0]
+    v2 = v.detach().numpy()[1][0]
+
+    p1 = p.detach().numpy()[0][7]
+    p2 = p.detach().numpy()[1][7]
+
+    print("Probabilities = {}, {}; Values = {}, {}".format(p1, p2, v1, v2))

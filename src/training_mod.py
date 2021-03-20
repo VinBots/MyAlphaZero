@@ -28,7 +28,7 @@ class AlphaZeroTraining:
         self.policy = policy
         self.vterm = []
         self.logterm = []
-        self.print_every = 50  # print stats every x episods
+        self.print_every = 10  # print stats every x episods
         self.losses = []
         self.self_play_time = []
         self.training_time = []
@@ -41,20 +41,20 @@ class AlphaZeroTraining:
         """
 
         losses_list = []
+        plt = None
         episods = self.game_training_settings.episods
         explore_steps = self.game_training_settings.explore_steps
-        temp = 1.0
         self_play_iterations = self.game_training_settings.self_play_iterations
         batch_size = self.nn_training_settings.batch_size
 
         for ep in range(episods):
+            temp = 1.0
             for e in range(self_play_iterations):
                 if e > self.game_training_settings.temp_threshold[0]:
                     temp = self.game_training_settings.temp_threshold[1]
                 new_exp = execute_self_play(
                     self.game_settings, explore_steps, self.policy, temp
                 )
-                # print (new_exp)
                 for i in range(len(new_exp)):
                     new_aug_exp = self.data_augmentation(new_exp[i])
                     buffer.add(new_aug_exp)
@@ -63,13 +63,16 @@ class AlphaZeroTraining:
                 losses, plt = self.policy.nn_train(buffer, batch_size)
                 losses_list.append(losses)
 
+            self.policy.save_weights()
             if (ep + 1) % self.print_every == 0:
                 self.show_stats(ep, losses_list, plt, buffer)
 
-        self.policy.save_weights()
+        # self.policy.save_weights()
         return losses_list
 
     def show_stats(self, ep, losses_list, plt, buffer):
+
+        print("Buffer size = {}".format(buffer.buffer_len()))
         print(
             "Loss - Moving average last 10 {}".format(
                 np.array(losses_list[-10:]).mean()
@@ -77,9 +80,11 @@ class AlphaZeroTraining:
         )
         print("Loss - last 10 {}".format(np.array(losses_list[-10:])))
         print("------------------------")
-        # plt = plot_grad_flow(self.policy.named_parameters())
-        # plt.savefig("nn_perf/gradients " + str(ep+1) + ".png")
-        # plt.show()
+        """
+        plt = plot_grad_flow(self.policy.named_parameters())
+        plt.savefig("nn_perf/gradients " + str(ep+1) + ".png")
+        plt.show()
+        """
         print("------------------------")
 
         wins, losses, draws = buffer.dist_outcomes()
@@ -89,6 +94,7 @@ class AlphaZeroTraining:
                 wins / total_outcomes, losses / total_outcomes, draws / total_outcomes
             )
         )
+
         test_final_positions(buffer)
 
     def data_augmentation(self, exp):

@@ -60,14 +60,20 @@ class Policy(nn.Module):
     def forward_batch(self, x):
 
         y = F.relu(self.conv(x))
+        # print (y.shape)
         y = y.view(-1, self.size)
+        # print (y.shape)
 
         y = self.fc1(y)
+        # print (y.shape)
+
         y = F.relu(self.fc2(y))
+        # print (y.shape)
 
         # the action head
         a = F.relu(self.fc_action1(y))
         a = self.fc_action2(a)
+        # print (a.shape)
 
         maxa = torch.max(a)
         mask = self.legal_actions_mask(x)
@@ -79,6 +85,10 @@ class Policy(nn.Module):
         # the value head
         value = F.relu(self.fc_value1(y))
         value = self.tanh_value(self.fc_value2(value))
+
+        # print (value.shape)
+
+        # print (prob.shape)
 
         return value, prob
 
@@ -98,6 +108,10 @@ class Policy(nn.Module):
 
         for i in range(training_steps):
             all_states, target_v, target_p = replay_buffer.stack(replay_buffer.sample())
+
+            target_v = torch.tensor(target_v).type(torch.FloatTensor)
+            target_p = torch.tensor(target_p).type(torch.FloatTensor)
+
             optimizer.zero_grad()
             pred_v, pred_p = self.forward_batch(torch.Tensor(all_states))
 
@@ -107,6 +121,8 @@ class Policy(nn.Module):
             loss.backward()
             # plt = plot_grad_flow(self.named_parameters())
             optimizer.step()
+            # print ("FORWARD BATCH {}".format(
+            # self.forward_batch(all_states)))
             losses += float(loss)
             del loss
 
@@ -127,7 +143,7 @@ class Policy(nn.Module):
 
     def loss_function(self, input_board, pred_v, pred_p, target_v, target_p):
 
-        # print (target_v)
+        # print (pred_p, target_p)
         # vlue_loss = ((pred_v - target_v)**2).sum()
         value_loss = (pred_v - target_v) ** 2
         # print ("value_loss: {}".format(value_loss))
@@ -135,6 +151,7 @@ class Policy(nn.Module):
         loglist = torch.where(
             pred_p > 0, torch.log(pred_p) * target_p, torch.tensor(0.0)
         )
+        # print ("loglist = {}".format(loglist))
         policy_loss = torch.sum(loglist, dim=1, keepdim=True)
         # print ("policy_loss = {}".format(policy_loss))
 

@@ -7,71 +7,6 @@ import numpy as np
 import torch
 
 
-'''
-def flip(x, dim):
-    indices = [slice(None)] * x.dim()
-    indices[dim] = torch.arange(
-        x.size(dim) - 1, -1, -1, dtype=torch.long, device=x.device
-    )
-    return x[tuple(indices)]
-
-def transformations (half=False):
-    """
-    Returns a list of transformation functions for exploiting symetries
-    """
-    # transformations
-    t0 = lambda x: x
-    t1 = lambda x: x[:, ::-1].copy()
-    t2 = lambda x: x[::-1, :].copy()
-    t3 = lambda x: x[::-1, ::-1].copy()
-    t4 = lambda x: x.T
-    t5 = lambda x: x[:, ::-1].T.copy()
-    t6 = lambda x: x[::-1, :].T.copy()
-    t7 = lambda x: x[::-1, ::-1].T.copy()
-
-    tlist = [t0, t1, t2, t3, t4, t5, t6, t7]
-    tlist_half = [t0, t1, t2, t3]
-    
-    # inverse transformations
-    t0inv = lambda x: x
-    t1inv = lambda x: flip(x, 1)
-    t2inv = lambda x: flip(x, 0)
-    t3inv = lambda x: flip(flip(x, 0), 1)
-    t4inv = lambda x: x.t()
-    t5inv = lambda x: flip(x, 0).t()
-    t6inv = lambda x: flip(x, 1).t()
-    t7inv = lambda x: flip(flip(x, 0), 1).t()
-
-    if half:
-        tinvlist_half = [t0inv, t1inv, t2inv, t3inv]
-        transformation_list_half = list(zip(tlist_half, tinvlist_half))
-        return transformation_list_half
-    
-    else:
-        tinvlist = [t0inv, t1inv, t2inv, t3inv, t4inv, t5inv, t6inv, t7inv]
-        transformation_list = list(zip(tlist, tinvlist))
-        return transformation_list
-
-
-def process_policy(policy, game):
-    
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    # for square board, add rotations as well
-    if game.size[0] == game.size[1]:
-        t, tinv = random.choice(transformations(half=False))
-    # otherwise only add reflections
-    else:
-        t, tinv = random.choice(transformations(half=True))
-    
-    frame = torch.tensor(t(game.state * game.player), dtype=torch.float, device=device)
-    input = frame.unsqueeze(0).unsqueeze(0)
-    prob, v = policy(input)
-    mask = torch.tensor(game.available_mask())
-    # we add a negative sign because when deciding next move,
-    # the current player is the previous player making the move
-    print ("PROB = {}".format(prob))
-    return game.available_moves(), tinv(prob)[mask].view(-1), v.squeeze().squeeze()
-'''
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
@@ -100,7 +35,7 @@ class Node:
         self.N = 0
         self.V = 0
         self.outcome = self.game.score
-        self.c_puct = 1.0
+        self.c_puct = 4.0
 
         # if game is won/loss/draw
         if self.game.score is not None:
@@ -244,10 +179,6 @@ class Node:
         nn_prob = torch.stack([node.prob for node in child.values()]).to(device)
 
         nextstate = random.choices(list(child.values()), weights=prob_choice)[0]
-        # nextstate = random.choices(list(child.values()))[0]
-
-        # V was for the previous player making a move
-        # to convert to the current player we add - sign
 
         prob = self.game.unmask(prob)
 
