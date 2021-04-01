@@ -9,7 +9,15 @@ from competition import match_net_mcts, match_ai, policy_player_mcts
 import policy_mod
 
 
-def execute_self_play(game_settings, explore_steps, policy, temp, dir_eps, dir_alpha, dirichlet_enabled = False):
+def execute_self_play(
+    game_settings,
+    explore_steps,
+    policy,
+    temp,
+    dir_eps,
+    dir_alpha,
+    dirichlet_enabled=False,
+):
     """
     Starts with an empty board and runs MCTS for every node traversed.
     Experiences are stored in a buffer for the neural network to be trained.
@@ -38,8 +46,15 @@ class AlphaZeroTraining:
     """
 
     def __init__(
-        self, game_settings, game_training_settings, nn_training_settings, benchmark_competition_settings, play_settings, policy, log_data
-        ):
+        self,
+        game_settings,
+        game_training_settings,
+        nn_training_settings,
+        benchmark_competition_settings,
+        play_settings,
+        policy,
+        log_data,
+    ):
         self.game_settings = game_settings
         self.game_training_settings = game_training_settings
         self.nn_training_settings = nn_training_settings
@@ -54,12 +69,14 @@ class AlphaZeroTraining:
         """
         Executes AlphaZero training algorithm
         1 generation includes:
-         - x iterations of self-play 
+         - x iterations of self-play
          - a number of epochs of neural network training
          - benchmark against a baseline
          - competition against old network
         """
-        temp_policy = policy_mod.Policy(self.temp_policy_path, self.nn_training_settings, self.log_data)
+        temp_policy = policy_mod.Policy(
+            self.temp_policy_path, self.nn_training_settings, self.log_data
+        )
         temp_policy.save_weights()
 
         generations = self.game_training_settings.generations
@@ -71,76 +88,94 @@ class AlphaZeroTraining:
         net_compet_threshold = self.benchmark_competition_settings.net_compet_threshold
         batch_size = self.nn_training_settings.batch_size
         temp = self.game_training_settings.temp
-        temp_policy_full_path = self.nn_training_settings.ckp_folder + "/" + self.temp_policy_path
+        temp_policy_full_path = (
+            self.nn_training_settings.ckp_folder + "/" + self.temp_policy_path
+        )
         compet_freq = self.benchmark_competition_settings.compet_freq
 
         for gen in range(generations):
             temp = 1.0
             for e in range(self_play_iterations):
                 new_exp = execute_self_play(
-                    self.game_settings, explore_steps, self.policy, temp, 
-                    dir_eps, dir_alpha, dirichlet_enabled = False
-                )                
+                    self.game_settings,
+                    explore_steps,
+                    self.policy,
+                    temp,
+                    dir_eps,
+                    dir_alpha,
+                    dirichlet_enabled=False,
+                )
                 for exp in new_exp:
-                    for _ in range (data_augmentation_times):
+                    for _ in range(data_augmentation_times):
                         buffer.add(self.data_augmentation(exp))
 
             if buffer.buffer_len() == buffer.buffer_size_target:
                 losses = temp_policy.nn_train(buffer, batch_size)
-                self.log_data.save_data ("nn_loss", gen, losses)
+                self.log_data.save_data("nn_loss", gen, losses)
                 temp_policy.save_weights()
-                
+
                 update_net = False
                 improvement_score = self.net_compet(gen)
                 if improvement_score and improvement_score > net_compet_threshold:
                     update_net = True
-                
+
                 if update_net or compet_freq == 0:
                     self.policy.load_weights(temp_policy_full_path)
                     self.policy.save_weights()
-                    #print ("Network replaced")
-            
+                    # print ("Network replaced")
+
             scores = self.benchmark(gen)
-            #print ("GEN : {} scores is {}".format(gen, scores))
-            if  scores:
-                self.log_data.save_data ("compet", gen, [scores])
-                    
+            # print ("GEN : {} scores is {}".format(gen, scores))
+            if scores:
+                self.log_data.save_data("compet", gen, [scores])
+
     def net_compet(self, gen):
         """
-        Measures the performance of the improved MCTS-policy 
+        Measures the performance of the improved MCTS-policy
         vs. the current MCTS-policy used for self-play generations"
         """
-        
+
         compet_freq = self.benchmark_competition_settings.compet_freq
         compet_rounds = self.benchmark_competition_settings.compet_rounds
-        
-        if compet_freq !=0 and (gen+1) % compet_freq == 0:
+
+        if compet_freq != 0 and (gen + 1) % compet_freq == 0:
             new_agent = policy_player_mcts
             old_agent = policy_player_mcts
             # TO DO
-            improvement_score = match_ai (self.game_settings, self.play_settings, 
-                                          new_agent, old_agent, total_rounds = compet_rounds)
+            improvement_score = match_ai(
+                self.game_settings,
+                self.play_settings,
+                new_agent,
+                old_agent,
+                total_rounds=compet_rounds,
+            )
             return improvement_score
-    
+
     def benchmark(self, gen):
         """
         Measures the performance of the network against a plain MCTS
-        
+
         #################IMPROVEMENTS###################
          - simulation of both player 1 and player 2
         """
-        
+
         benchmark_freq = self.benchmark_competition_settings.benchmark_freq
         benchmark_rounds = self.benchmark_competition_settings.benchmark_rounds
         mcts_iterations = self.benchmark_competition_settings.mcts_iterations
         mcts_random_moves = self.benchmark_competition_settings.mcts_random_moves
 
-        if benchmark_freq !=0 and (gen + 1) % benchmark_freq == 0:
-            scores1 = match_net_mcts(self.policy, self.game_settings, benchmark_rounds, mcts_iterations, mcts_random_moves) 
-            #scores2 = match_mcts_net(self.policy, self.game_settings)     
-            #scores = scores1 + scores2
-            return scores1   
-                
+        if benchmark_freq != 0 and (gen + 1) % benchmark_freq == 0:
+            scores1 = match_net_mcts(
+                self.policy,
+                self.game_settings,
+                benchmark_rounds,
+                mcts_iterations,
+                mcts_random_moves,
+            )
+            # scores2 = match_mcts_net(self.policy, self.game_settings)
+            # scores = scores1 + scores2
+            return scores1
+
     def data_augmentation(self, exp):
 
         input_board, v, prob = exp
@@ -159,11 +194,11 @@ class AlphaZeroTraining:
     def transformations(self):
         """
         Returns a list of transformation functions for exploiting symetries
-        
+
         #################IMPROVEMENTS###################
          - review symetries 5 and 6
         """
-        
+
         # transformations
         t0 = lambda x: x
         t1 = lambda x: x[:, ::-1].copy()

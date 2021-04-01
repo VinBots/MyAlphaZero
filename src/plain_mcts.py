@@ -17,7 +17,7 @@ class Node:
     create_child() creates self.child by iterating over possible actions from a given node
     """
 
-    def __init__(self, game, mother=None, prob = None):
+    def __init__(self, game, mother=None, prob=None):
         self.game = game
         self.child = {}
         self.U = 0
@@ -79,11 +79,11 @@ class Node:
         if not current.child and current.outcome is None:
 
             current.V = -current.game.player * self.roll_out(current.game)
-            #print ("Current player {}; V {}".format(
-                #current.game.player, current.V))
+            # print ("Current player {}; V {}".format(
+            # current.game.player, current.V))
             next_actions = current.game.available_moves()
             current.create_child(next_actions)
-            
+
         current.N += 1
 
         # Updates U and back-prop
@@ -96,9 +96,9 @@ class Node:
             # update U for all sibling nodes
             for sibling in mother.child.values():
                 if sibling.U is not float("inf") and sibling.U is not -float("inf"):
-                    sibling.U = sibling.V + self.c_puct * sqrt(
-                        mother.N
-                    ) / (1 + sibling.N)
+                    sibling.U = sibling.V + self.c_puct * sqrt(mother.N) / (
+                        1 + sibling.N
+                    )
             current = current.mother
 
     def next(self, temperature=1.0):
@@ -112,14 +112,15 @@ class Node:
         if not self.child:
             print(self.game.state)
             raise ValueError("no children found and game hasn't ended")
-        
-        totalN = max(node.N for node in self.child.values()) + 1
-        prob_choice = np.array([(node.N / totalN) ** (1 / temperature) for node in self.child.values()])
-        #print ("N[4] = {}".format(list(self.child.values())[4].N))
 
+        totalN = max(node.N for node in self.child.values()) + 1
+        prob_choice = np.array(
+            [(node.N / totalN) ** (1 / temperature) for node in self.child.values()]
+        )
+        # print ("N[4] = {}".format(list(self.child.values())[4].N))
 
         prob_choice = self.normalize(prob_choice)
-        #print ("Probabilities = {}".format(prob_choice))
+        # print ("Probabilities = {}".format(prob_choice))
         nextstate = random.choices(list(self.child.values()), weights=prob_choice)[0]
         return nextstate
 
@@ -138,16 +139,16 @@ class Node:
     def detach_mother(self):
         del self.mother
         self.mother = None
-        
-    def roll_out (self, game, nb_roll_out = 1):
-        #print ("Roll out asked for game state {}".format(game.state))
+
+    def roll_out(self, game, nb_roll_out=1):
+        # print ("Roll out asked for game state {}".format(game.state))
         scores = []
         for _ in range(nb_roll_out):
             sim_game = copy(game)
-            while sim_game.score == None:          
+            while sim_game.score == None:
                 random_move = random.choice(sim_game.available_moves())
-                #print (random_move)
+                # print (random_move)
                 sim_game.move(random_move)
-                #print (sim_game.state)
+                # print (sim_game.state)
             scores.append(sim_game.score)
         return np.average(np.array(scores))

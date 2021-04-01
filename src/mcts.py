@@ -55,7 +55,7 @@ class Node:
         child = {tuple(a): Node(g, self, p) for a, g, p in zip(actions, games, probs)}
         self.child = child
 
-    def explore(self, policy, dir_eps, dir_alpha, dirichlet_enabled = False):
+    def explore(self, policy, dir_eps, dir_alpha, dirichlet_enabled=False):
         """
         Implements the expansion, simulation and backpropagation steps
         This method should be further split
@@ -103,17 +103,17 @@ class Node:
                 .unsqueeze(0)
             )
 
-            v, probs = policy.forward_batch(input, dim_value = 0)
+            v, probs = policy.forward_batch(input, dim_value=0)
             current.V = -float(v.squeeze().squeeze())
-            
+
             mask = torch.tensor(current.game.available_mask())
-            probs = self.normalize(probs.view(3,3)[mask].view(-1))
-            if dirichlet_enabled:                
+            probs = self.normalize(probs.view(3, 3)[mask].view(-1))
+            if dirichlet_enabled:
                 probs = self.dirichlet_noise(probs, dir_eps, dir_alpha)
-            
+
             next_actions = current.game.available_moves()
             current.create_child(next_actions, probs)
-            
+
         current.N += 1
 
         # Updates U and back-prop
@@ -166,11 +166,11 @@ class Node:
                 [(node.N / totalN) ** (1 / temperature) for node in child.values()],
                 device=device,
             )
-            
+
         prob = self.normalize(prob)
         prob_choice = self.normalize(prob_choice)
 
-        nn_prob = torch.stack([node.prob for node in child.values()]).to(device)         
+        nn_prob = torch.stack([node.prob for node in child.values()]).to(device)
 
         nextstate = random.choices(list(child.values()), weights=prob_choice)[0]
 
@@ -197,8 +197,8 @@ class Node:
         self.mother = None
 
     def dirichlet_noise(self, probs, dir_eps, dir_alpha):
-        
-        noise = torch.distributions.Dirichlet(torch.tensor([dir_alpha] * len(probs))).sample()
-        return (1-dir_eps) * probs + dir_eps * noise
-    
-        
+
+        noise = torch.distributions.Dirichlet(
+            torch.tensor([dir_alpha] * len(probs))
+        ).sample()
+        return (1 - dir_eps) * probs + dir_eps * noise

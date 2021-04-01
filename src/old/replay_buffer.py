@@ -14,7 +14,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 class ReplayBuffer:
     """Fixed-size buffer to store experience tuples."""
 
-    def __init__(self, buffer_size, batch_size, seed=0, deduplicate = False):
+    def __init__(self, buffer_size, batch_size, seed=0, deduplicate=False):
         """
         Initializes a ReplayBuffer object
         """
@@ -127,8 +127,8 @@ class ReplayBuffer:
         return (None, None)
 
     def average_v(self, x1, x2):
-        return x2 + 0.1 * (x1-x2)
+        return x2 + 0.1 * (x1 - x2)
 
     def average_p(self, a, b):
-        return b + 0.1 * (a-b)
+        return b + 0.1 * (a - b)
         # return [(f + g) /2 for f,g in zip(a,b)]

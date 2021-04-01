@@ -34,23 +34,24 @@ def policy_player_mcts(game, play_settings=None, policy_path="ai_ckp.pth"):
     return mytreenext.game.last_move
 
 
-def network_only (game_state, play_settings=None, policy_path="ai_ckp.pth"):
+def network_only(game_state, play_settings=None, policy_path="ai_ckp.pth"):
     """to do"""
-    #print ("NETWORK ONLY PLAYING")
+    # print ("NETWORK ONLY PLAYING")
 
     policy = policy_mod.Policy()
     policy.load_weights(policy_path)
     board = torch.tensor(game_state).type(torch.FloatTensor).unsqueeze(0).unsqueeze(0)
 
     v, prob = policy.forward_batch(board)
-    prob_array = prob.detach().numpy().reshape((3,3))
+    prob_array = prob.detach().numpy().reshape((3, 3))
     prob_array = prob_array * (np.abs(game_state) != 1).astype(np.uint8)
-    print (board, prob_array)
+    print(board, prob_array)
     return np.unravel_index(np.argmax(prob_array, axis=None), prob_array.shape)
 
 
 def random_player(game, play_settings=None):
     return random.choice(game.available_moves())
+
 
 def match_ai(game_settings, play_settings, player1_func, player2_func, total_rounds=1):
     """TO DO"""
@@ -58,21 +59,21 @@ def match_ai(game_settings, play_settings, player1_func, player2_func, total_rou
     total_wins = 0
     total_losses = 0
     player_turn = 1
-    
+
     for _ in range(total_rounds):
         player_turn = 1
         game = games_mod.ConnectN(game_settings)
         player1 = player1_func
         player2 = player2_func
-        
+
         curr_player = player1
         score = None
 
         while score is None:
-            print (game.state)
+            print(game.state)
             game_state = player_turn * game.state
             loc = curr_player(game_state, play_settings)
-            
+
             succeed = game.move(loc)
 
             if succeed:
@@ -83,7 +84,7 @@ def match_ai(game_settings, play_settings, player1_func, player2_func, total_rou
                 else:
                     curr_player = player1
                     player_turn = 1
-        
+
         if score == 1:
             total_wins += score
         elif score == -1:

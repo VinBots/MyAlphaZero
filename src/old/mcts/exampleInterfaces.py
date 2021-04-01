@@ -1,4 +1,4 @@
-class StateInterface():
+class StateInterface:
     def getPossibleActions(self):
         raise NotImplementedError()
 
@@ -16,7 +16,7 @@ class StateInterface():
         raise NotImplementedError()
 
 
-class ActionInterface():
+class ActionInterface:
     def __eq__(self, other):
         raise NotImplementedError
 

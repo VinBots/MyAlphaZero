@@ -4,7 +4,15 @@ import torch
 import numpy as np
 
 
-def execute_self_play(game_settings, explore_steps, policy, temp, dir_eps, dir_alpha, dirichlet_enabled = False):
+def execute_self_play(
+    game_settings,
+    explore_steps,
+    policy,
+    temp,
+    dir_eps,
+    dir_alpha,
+    dirichlet_enabled=False,
+):
     """
     Starts with an empty board and runs MCTS for every node traversed.
     Experiences are stored in a buffer for the neural network to be trained.
