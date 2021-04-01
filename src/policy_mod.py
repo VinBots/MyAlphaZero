@@ -4,17 +4,22 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import matplotlib.pyplot as plt
-from net_utils import plot_grad_flow
 
 
 class Policy(nn.Module):
-    def __init__(self, nn_training_settings=None):
+    def __init__(self, path, nn_training_settings=None, log_data = None):
         super(Policy, self).__init__()
-        depth = 16
+        self.path = path
         self.nn_training_settings = nn_training_settings
-
-        self.conv = nn.Conv2d(1, depth, kernel_size=2, stride=1, bias=False)
-        self.size = 2 * 2 * depth
+        self.log_data = log_data
+        
+        torch.set_default_dtype(torch.float32)
+        self.kernel_dim = 2
+        self.stride = 1
+        depth = 16
+        
+        self.conv = nn.Conv2d(1, depth, kernel_size=self.kernel_dim, stride=self.stride, bias=False)
+        self.size = self.kernel_dim * self.kernel_dim * depth
         self.fc1 = nn.Linear(self.size, 32)
         self.fc2 = nn.Linear(32, 32)
 
@@ -26,171 +31,121 @@ class Policy(nn.Module):
         self.fc_value1 = nn.Linear(32, 8)
         self.fc_value2 = nn.Linear(8, 1)
         self.tanh_value = nn.Tanh()
-        self.store_counter = 0
-        self.all_parameters = {}
-        self.loss_records = []
+        
+        self.train_steps_count = 0
 
-    def forward(self, x):
+    def forward_batch(self, x, dim_value = 1):
+        """
+        Forward pass of the tensor x
+        """
 
         y = F.relu(self.conv(x))
         y = y.view(-1, self.size)
         y = self.fc1(y)
         y = F.relu(self.fc2(y))
-        # the action head
-        a = F.relu(self.fc_action1(y))
-        a = self.fc_action2(a)
-
-        # availability of moves
-        avail = (torch.abs(x.squeeze()) != 1).type(torch.FloatTensor)
-        avail = avail.view(-1, 9)
-
-        # locations where actions are not possible, we set the prob to zero
-        maxa = torch.max(a)
-        # subtract off max for numerical stability (avoids blowing up at infinity)
-        exp = avail * torch.exp(a - maxa)
-        prob = exp / torch.sum(exp)
-
-        # the value head
-        value = F.relu(self.fc_value1(y))
-        value = self.tanh_value(self.fc_value2(value))
-
-        return prob.view(3, 3), value
-        # return prob, value
-
-    def forward_batch(self, x):
-
-        y = F.relu(self.conv(x))
-        # print (y.shape)
-        y = y.view(-1, self.size)
-        # print (y.shape)
-
-        y = self.fc1(y)
-        # print (y.shape)
-
-        y = F.relu(self.fc2(y))
-        # print (y.shape)
 
         # the action head
         a = F.relu(self.fc_action1(y))
         a = self.fc_action2(a)
-        # print (a.shape)
-
-        maxa = torch.max(a)
+        
         mask = self.legal_actions_mask(x)
-        exp = mask * torch.exp(a - maxa)
-        prob = exp / torch.sum(exp, 1, keepdim=True)
-        # print ("Probabilities vectors: {}".format(prob))
-        # print ("board positions: {}".format(x))
-
-        # the value head
+        a = mask * a
+        
+        maxa = torch.max(a)
+        prob = F.softmax (a - maxa, dim = dim_value)
+        
         value = F.relu(self.fc_value1(y))
         value = self.tanh_value(self.fc_value2(value))
-
-        # print (value.shape)
-
-        # print (prob.shape)
 
         return value, prob
 
     def nn_train(self, replay_buffer, batch_size):
         """
-        Calculates the loss function and applies gradient descent to minimize it
+        Trains the network by mini-batch gradient descent for a number of epochs
         """
-        training_steps = self.nn_training_settings.training_steps
+        
+        buffer_size = replay_buffer.buffer_len()
         losses = 0
-
+        value_losses = 0
+        prob_losses = 0
+        
         self.train()
         optimizer = optim.Adam(
             self.parameters(),
             lr=self.nn_training_settings.lr,
             weight_decay=self.nn_training_settings.weight_decay,
         )
+        
+        all_states, all_target_v, all_target_p = replay_buffer.stack(replay_buffer.memory.items())
+        training_steps = 0
+        for epoch in range(self.nn_training_settings.n_epochs):
 
-        for i in range(training_steps):
-            all_states, target_v, target_p = replay_buffer.stack(replay_buffer.sample())
+            permutation = torch.randperm(buffer_size)
 
-            target_v = torch.tensor(target_v).type(torch.FloatTensor)
-            target_p = torch.tensor(target_p).type(torch.FloatTensor)
+            for i in range(0, buffer_size, batch_size):
 
-            optimizer.zero_grad()
-            pred_v, pred_p = self.forward_batch(torch.Tensor(all_states))
+                training_steps+=1
+                self.train_steps_count+=1
+                indices = permutation[i:i+batch_size]
+                states, target_v, target_p = all_states[indices], all_target_v[indices], all_target_p[indices]
+                optimizer.zero_grad()
+                pred_v, pred_p = self.forward_batch(torch.tensor(states))
 
-            loss = self.loss_function(
-                torch.Tensor(all_states), pred_v, pred_p, target_v, target_p
-            )
-            loss.backward()
-            # plt = plot_grad_flow(self.named_parameters())
-            optimizer.step()
-            # print ("FORWARD BATCH {}".format(
-            # self.forward_batch(all_states)))
-            losses += float(loss)
-            del loss
+                loss, value_loss, prob_loss = self.loss_function(
+                    torch.tensor(states), pred_v, pred_p, target_v, target_p
+                )
 
-        self.store_parameters()
+                loss.backward()
+                self.log_data.save_grads(self.train_steps_count, self.named_parameters())
 
-        # Print model's state_dict
-        # print("Model's state_dict:")
-        # for param_tensor in self.state_dict():
-        #    print(param_tensor, "\t", self.state_dict()[param_tensor])
-        # for name, param in self.named_parameters():
-        #    print(name, param.grad.norm())
+                optimizer.step()
+                losses += float(loss)
+                value_losses += float(value_loss)
+                prob_losses += float(prob_loss)           
 
-        # Print optimizer's state_dict
-        # print("Optimizer's state_dict:")
-        # for var_name in optimizer.state_dict():
-        # print(var_name, "\t", optimizer.state_dict()[var_name])
-        return float(losses / training_steps), plt
+                del loss
+
+        return [losses / training_steps, value_losses / training_steps, prob_losses / training_steps]
 
     def loss_function(self, input_board, pred_v, pred_p, target_v, target_p):
 
-        # print (pred_p, target_p)
-        # vlue_loss = ((pred_v - target_v)**2).sum()
         value_loss = (pred_v - target_v) ** 2
-        # print ("value_loss: {}".format(value_loss))
 
         loglist = torch.where(
             pred_p > 0, torch.log(pred_p) * target_p, torch.tensor(0.0)
         )
-        # print ("loglist = {}".format(loglist))
         policy_loss = torch.sum(loglist, dim=1, keepdim=True)
-        # print ("policy_loss = {}".format(policy_loss))
 
         constant_list = torch.where(
             target_p > 0, torch.log(target_p) * target_p, torch.tensor(0.0)
         )
         constant = torch.sum(constant_list, dim=1, keepdim=True)
-        # print ("constant: {}".format(constant))
+        
+        value_loss = value_loss.sum()
+        prob_loss = -policy_loss.sum() + constant.sum()
+        loss = value_loss + prob_loss
 
-        loss = value_loss - policy_loss + constant
-        loss = loss.squeeze().sum()
-        # print ("loss = {}".format(loss))
-
-        self.loss_records.append(
-            np.array([value_loss.sum(), -policy_loss.sum(), constant.sum()])
-            / pred_p.size()[0]
-        )
-
-        return loss / pred_p.size()[0]
+        return (loss / pred_p.size()[0], value_loss / pred_p.size()[0], prob_loss / pred_p.size()[0])
 
     def save_weights(self):
-        torch.save(self.state_dict(), "ai_ckp.pth")
+        """
+        Saves the network checkpoints
+        """
+        
+        full_path = self.nn_training_settings.ckp_folder + "/" + self.path
+        torch.save(self.state_dict(), full_path)
 
     def load_weights(self, path):
+        """
+        Loads weights of the network saved in path
+        """
         self.load_state_dict(torch.load(path))
-        # self.eval()
-        # print ("Models: {} loaded...".format(path))
-
-    def store_parameters(self):
-        """
-        Stores the parameters of the model
-        """
-        self.store_counter += 1
-        self.all_parameters[self.store_counter] = self.parameters()
 
     def legal_actions_mask(self, x):
         """
         Returns a mask over legal actions
         """
+        
         mask1 = (torch.abs(x) != 1).type(torch.FloatTensor).view(-1, 9)
         mask2 = torch.where(mask1 > 0, mask1, torch.tensor(1e-10))
         return mask2

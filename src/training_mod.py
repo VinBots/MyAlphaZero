@@ -1,107 +1,150 @@
-import time
 import numpy as np
 import random
-
-import torch.optim as optim
 import torch
-import progressbar as pb
 
 import mcts
 import games_mod
-from self_play import execute_self_play, fake_play
-from net_utils import plot_grad_flow
-from test1 import test_final_positions
+from log_data import LogData
+from competition import match_net_mcts, match_ai, policy_player_mcts
+import policy_mod
+
+
+def execute_self_play(game_settings, explore_steps, policy, temp, dir_eps, dir_alpha, dirichlet_enabled = False):
+    """
+    Starts with an empty board and runs MCTS for every node traversed.
+    Experiences are stored in a buffer for the neural network to be trained.
+    Returns a list of experiences in a list [state, value, probability]
+    """
+    memory = []
+    mytree = mcts.Node(games_mod.ConnectN(game_settings))
+
+    while mytree.outcome is None:
+        for _ in range(explore_steps):
+            mytree.explore(policy, dir_eps, dir_alpha, dirichlet_enabled)
+        current_player = mytree.game.player
+        mytree, (state, _, p) = mytree.next(temperature=temp)
+        memory.append([state * current_player, p, current_player])
+        mytree.detach_mother()
+        outcome = mytree.outcome
+
+    return [(m[0], m[2] * outcome, m[1]) for m in memory]
 
 
 class AlphaZeroTraining:
     """
-    Runs the AlphaZero training by launching episods of self-play
-    and training a neural network after each self-play
+    Runs the AlphaZero training by launching generations of self-play
+    and training a neural network for a number of epochs after each self-play
+    The network used for generating self-play game is replaced by either the latest network post-training or by the winner of the competition between the old network and the current network post-training.
     """
 
     def __init__(
-        self, game_settings, game_training_settings, nn_training_settings, policy
-    ):
+        self, game_settings, game_training_settings, nn_training_settings, benchmark_competition_settings, play_settings, policy, log_data
+        ):
         self.game_settings = game_settings
         self.game_training_settings = game_training_settings
         self.nn_training_settings = nn_training_settings
+        self.benchmark_competition_settings = benchmark_competition_settings
+        self.play_settings = play_settings
         self.policy = policy
-        self.vterm = []
-        self.logterm = []
-        self.print_every = 10  # print stats every x episods
-        self.losses = []
-        self.self_play_time = []
-        self.training_time = []
-        self.mcts_explore_time = []
-        self.count_steps = []
+        self.log_data = log_data
+        self.competition_scores = []
+        self.temp_policy_path = "ai_temp_ckp.pth"
 
     def training_pipeline(self, buffer):
         """
         Executes AlphaZero training algorithm
+        1 generation includes:
+         - x iterations of self-play 
+         - a number of epochs of neural network training
+         - benchmark against a baseline
+         - competition against old network
         """
+        temp_policy = policy_mod.Policy(self.temp_policy_path, self.nn_training_settings, self.log_data)
+        temp_policy.save_weights()
 
-        losses_list = []
-        plt = None
-        episods = self.game_training_settings.episods
+        generations = self.game_training_settings.generations
         explore_steps = self.game_training_settings.explore_steps
         self_play_iterations = self.game_training_settings.self_play_iterations
+        dir_eps = self.game_training_settings.dir_eps
+        dir_alpha = self.game_training_settings.dir_alpha
+        data_augmentation_times = self.game_training_settings.data_augmentation_times
+        net_compet_threshold = self.benchmark_competition_settings.net_compet_threshold
         batch_size = self.nn_training_settings.batch_size
+        temp = self.game_training_settings.temp
+        temp_policy_full_path = self.nn_training_settings.ckp_folder + "/" + self.temp_policy_path
+        compet_freq = self.benchmark_competition_settings.compet_freq
 
-        for ep in range(episods):
+        for gen in range(generations):
             temp = 1.0
             for e in range(self_play_iterations):
-                if e > self.game_training_settings.temp_threshold[0]:
-                    temp = self.game_training_settings.temp_threshold[1]
                 new_exp = execute_self_play(
-                    self.game_settings, explore_steps, self.policy, temp
-                )
-                for i in range(len(new_exp)):
-                    new_aug_exp = self.data_augmentation(new_exp[i])
-                    buffer.add(new_aug_exp)
+                    self.game_settings, explore_steps, self.policy, temp, 
+                    dir_eps, dir_alpha, dirichlet_enabled = False
+                )                
+                for exp in new_exp:
+                    for _ in range (data_augmentation_times):
+                        buffer.add(self.data_augmentation(exp))
 
-            if buffer.buffer_len() == buffer.buffer_size:
-                losses, plt = self.policy.nn_train(buffer, batch_size)
-                losses_list.append(losses)
-
-            self.policy.save_weights()
-            if (ep + 1) % self.print_every == 0:
-                self.show_stats(ep, losses_list, plt, buffer)
-
-        # self.policy.save_weights()
-        return losses_list
-
-    def show_stats(self, ep, losses_list, plt, buffer):
-
-        print("Buffer size = {}".format(buffer.buffer_len()))
-        print(
-            "Loss - Moving average last 10 {}".format(
-                np.array(losses_list[-10:]).mean()
-            )
-        )
-        print("Loss - last 10 {}".format(np.array(losses_list[-10:])))
-        print("------------------------")
+            if buffer.buffer_len() == buffer.buffer_size_target:
+                losses = temp_policy.nn_train(buffer, batch_size)
+                self.log_data.save_data ("nn_loss", gen, losses)
+                temp_policy.save_weights()
+                
+                update_net = False
+                improvement_score = self.net_compet(gen)
+                if improvement_score and improvement_score > net_compet_threshold:
+                    update_net = True
+                
+                if update_net or compet_freq == 0:
+                    self.policy.load_weights(temp_policy_full_path)
+                    self.policy.save_weights()
+                    #print ("Network replaced")
+            
+            scores = self.benchmark(gen)
+            #print ("GEN : {} scores is {}".format(gen, scores))
+            if  scores:
+                self.log_data.save_data ("compet", gen, [scores])
+                    
+    def net_compet(self, gen):
         """
-        plt = plot_grad_flow(self.policy.named_parameters())
-        plt.savefig("nn_perf/gradients " + str(ep+1) + ".png")
-        plt.show()
+        Measures the performance of the improved MCTS-policy 
+        vs. the current MCTS-policy used for self-play generations"
         """
-        print("------------------------")
+        
+        compet_freq = self.benchmark_competition_settings.compet_freq
+        compet_rounds = self.benchmark_competition_settings.compet_rounds
+        
+        if compet_freq !=0 and (gen+1) % compet_freq == 0:
+            new_agent = policy_player_mcts
+            old_agent = policy_player_mcts
+            # TO DO
+            improvement_score = match_ai (self.game_settings, self.play_settings, 
+                                          new_agent, old_agent, total_rounds = compet_rounds)
+            return improvement_score
+    
+    def benchmark(self, gen):
+        """
+        Measures the performance of the network against a plain MCTS
+        
+        #################IMPROVEMENTS###################
+         - simulation of both player 1 and player 2
+        """
+        
+        benchmark_freq = self.benchmark_competition_settings.benchmark_freq
+        benchmark_rounds = self.benchmark_competition_settings.benchmark_rounds
+        mcts_iterations = self.benchmark_competition_settings.mcts_iterations
+        mcts_random_moves = self.benchmark_competition_settings.mcts_random_moves
 
-        wins, losses, draws = buffer.dist_outcomes()
-        total_outcomes = wins + losses + draws
-        print(
-            "Wins % : {:.2%}, Losses % : {:.2%}, Draws % : {:.2%}".format(
-                wins / total_outcomes, losses / total_outcomes, draws / total_outcomes
-            )
-        )
-
-        test_final_positions(buffer)
-
+        if benchmark_freq !=0 and (gen + 1) % benchmark_freq == 0:
+            scores1 = match_net_mcts(self.policy, self.game_settings, benchmark_rounds, mcts_iterations, mcts_random_moves) 
+            #scores2 = match_mcts_net(self.policy, self.game_settings)     
+            #scores = scores1 + scores2
+            return scores1   
+                
     def data_augmentation(self, exp):
 
-        # for square board, add rotations as well
         input_board, v, prob = exp
-        t, tinv = random.choice(self.transformations(half=False))
+        t, tinv = random.choice(self.transformations())
         prob = prob.reshape(3, 3)
         return t(input_board), v, tinv(prob).reshape(1, 9).squeeze(0)
 
@@ -113,16 +156,21 @@ class AlphaZeroTraining:
         )
         return x[tuple(indices)]
 
-    def transformations(self, half=False):
+    def transformations(self):
         """
         Returns a list of transformation functions for exploiting symetries
+        
+        #################IMPROVEMENTS###################
+         - review symetries 5 and 6
         """
+        
         # transformations
         t0 = lambda x: x
         t1 = lambda x: x[:, ::-1].copy()
         t2 = lambda x: x[::-1, :].copy()
         t3 = lambda x: x[::-1, ::-1].copy()
         t4 = lambda x: x.T
+        # TO DO
         # t5 = lambda x: x[:, ::-1].T.copy()
         # t6 = lambda x: x[::-1, :].T.copy()
         t7 = lambda x: x[::-1, ::-1].T.copy()
@@ -136,16 +184,11 @@ class AlphaZeroTraining:
         t2inv = lambda x: self.flip(x, 0)
         t3inv = lambda x: self.flip(self.flip(x, 0), 1)
         t4inv = lambda x: x.t()
+        # TO DO
         # t5inv = lambda x: self.flip(x, 0).t()
         # t6inv = lambda x: self.flip(x, 1).t()
         t7inv = lambda x: self.flip(self.flip(x, 0), 1).t()
 
-        if half:
-            tinvlist_half = [t0inv, t1inv, t2inv, t3inv]
-            transformation_list_half = list(zip(tlist_half, tinvlist_half))
-            return transformation_list_half
-
-        else:
-            tinvlist = [t0inv, t1inv, t2inv, t3inv, t4inv, t7inv]
-            transformation_list = list(zip(tlist, tinvlist))
-            return transformation_list
+        tinvlist = [t0inv, t1inv, t2inv, t3inv, t4inv, t7inv]
+        transformation_list = list(zip(tlist, tinvlist))
+        return transformation_list

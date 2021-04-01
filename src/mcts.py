@@ -6,7 +6,6 @@ import time
 import numpy as np
 import torch
 
-
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
@@ -35,7 +34,7 @@ class Node:
         self.N = 0
         self.V = 0
         self.outcome = self.game.score
-        self.c_puct = 4.0
+        self.c_puct = 1.0
 
         # if game is won/loss/draw
         if self.game.score is not None:
@@ -56,7 +55,7 @@ class Node:
         child = {tuple(a): Node(g, self, p) for a, g, p in zip(actions, games, probs)}
         self.child = child
 
-    def explore(self, policy):
+    def explore(self, policy, dir_eps, dir_alpha, dirichlet_enabled = False):
         """
         Implements the expansion, simulation and backpropagation steps
         This method should be further split
@@ -93,8 +92,6 @@ class Node:
         if not current.child and current.outcome is None:
             # policy outputs results from the perspective of the next player
             # thus extra - sign is needed
-            # next_actions, probs, v = process_policy(policy, current.game)
-            # print (next_actions, probs, v)
 
             input = (
                 torch.tensor(
@@ -106,26 +103,24 @@ class Node:
                 .unsqueeze(0)
             )
 
-            # next_actions, probs, v = process_policy(policy, current.game)
-
-            probs, v = policy(input)
+            v, probs = policy.forward_batch(input, dim_value = 0)
+            current.V = -float(v.squeeze().squeeze())
+            
             mask = torch.tensor(current.game.available_mask())
-            probs = probs[mask].view(-1)
-            v = v.squeeze().squeeze()
+            probs = self.normalize(probs.view(3,3)[mask].view(-1))
+            if dirichlet_enabled:                
+                probs = self.dirichlet_noise(probs, dir_eps, dir_alpha)
+            
             next_actions = current.game.available_moves()
-            # print (next_actions, probs, v)
-
-            # print ("process_policy = {}".format((next_actions, probs, v)))
-            current.nn_v = -v
             current.create_child(next_actions, probs)
-            current.V = -float(v)
+            
         current.N += 1
 
         # Updates U and back-prop
         while current.mother:
             mother = current.mother
             mother.N += 1
-            # beteen mother and child, the player is switched, extra - sign
+            # between mother and child, the player is switched, extra - sign
             mother.V += (-current.V - mother.V) / mother.N
 
             # update U for all sibling nodes
@@ -149,7 +144,6 @@ class Node:
             raise ValueError("no children found and game hasn't ended")
         child = self.child
 
-        # if there are winning moves, just output those
         max_U = max(c.U for c in child.values())
 
         if max_U == float("inf"):
@@ -172,11 +166,11 @@ class Node:
                 [(node.N / totalN) ** (1 / temperature) for node in child.values()],
                 device=device,
             )
+            
+        prob = self.normalize(prob)
+        prob_choice = self.normalize(prob_choice)
 
-        self.normalize(prob, len(child))
-        self.normalize(prob_choice, len(child))
-
-        nn_prob = torch.stack([node.prob for node in child.values()]).to(device)
+        nn_prob = torch.stack([node.prob for node in child.values()]).to(device)         
 
         nextstate = random.choices(list(child.values()), weights=prob_choice)[0]
 
@@ -184,17 +178,27 @@ class Node:
 
         return nextstate, (new_state, -self.V, prob)
 
-    def normalize(self, prob, len_child):
-        # normalize the probability
+    def normalize(self, prob):
+        """
+        Normalize a tensor into a probability distribution
+        """
         if torch.sum(prob) > 0:
             prob /= torch.sum(prob)
 
         # if sum is zero, just make things random
         else:
-            prob = torch.tensor(1.0 / len_child).repeat(len_child)
+            num_elements = torch.numel(prob)
+            prob = torch.tensor(1.0 / num_elements).repeat(num_elements)
 
         return prob
 
     def detach_mother(self):
         del self.mother
         self.mother = None
+
+    def dirichlet_noise(self, probs, dir_eps, dir_alpha):
+        
+        noise = torch.distributions.Dirichlet(torch.tensor([dir_alpha] * len(probs))).sample()
+        return (1-dir_eps) * probs + dir_eps * noise
+    
+        
