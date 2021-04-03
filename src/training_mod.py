@@ -7,6 +7,7 @@ import games_mod
 from log_data import LogData
 from competition import match_net_mcts, match_ai, policy_player_mcts
 import policy_mod
+from oracles import roll_out, nn_infer
 
 
 def execute_self_play(
@@ -24,11 +25,12 @@ def execute_self_play(
     Returns a list of experiences in a list [state, value, probability]
     """
     memory = []
-    mytree = mcts.Node(games_mod.ConnectN(game_settings))
+    mytree = mcts.Node(games_mod.ConnectN(game_settings), oracle = nn_infer)
+    orac_params = {"policy":policy}
 
     while mytree.outcome is None:
         for _ in range(explore_steps):
-            mytree.explore(policy, dir_eps, dir_alpha, dirichlet_enabled)
+            mytree.explore(orac_params)
         current_player = mytree.game.player
         mytree, (state, _, p) = mytree.next(temperature=temp)
         memory.append([state * current_player, p, current_player])
@@ -49,6 +51,7 @@ class AlphaZeroTraining:
         self,
         game_settings,
         game_training_settings,
+        mcts_settings,
         nn_training_settings,
         benchmark_competition_settings,
         play_settings,
@@ -57,6 +60,7 @@ class AlphaZeroTraining:
     ):
         self.game_settings = game_settings
         self.game_training_settings = game_training_settings
+        self.mcts_settings = mcts_settings
         self.nn_training_settings = nn_training_settings
         self.benchmark_competition_settings = benchmark_competition_settings
         self.play_settings = play_settings
@@ -80,17 +84,21 @@ class AlphaZeroTraining:
         temp_policy.save_weights()
 
         generations = self.game_training_settings.generations
-        explore_steps = self.game_training_settings.explore_steps
         self_play_iterations = self.game_training_settings.self_play_iterations
-        dir_eps = self.game_training_settings.dir_eps
-        dir_alpha = self.game_training_settings.dir_alpha
         data_augmentation_times = self.game_training_settings.data_augmentation_times
-        net_compet_threshold = self.benchmark_competition_settings.net_compet_threshold
+        
+        explore_steps = self.mcts_settings.explore_steps
+        temp = self.mcts_settings.temp
+        dir_eps = self.mcts_settings.dir_eps
+        dir_alpha = self.mcts_settings.dir_alpha
+        dir_enabled = self.mcts_settings.dir_enabled
+        
         batch_size = self.nn_training_settings.batch_size
-        temp = self.game_training_settings.temp
         temp_policy_full_path = (
             self.nn_training_settings.ckp_folder + "/" + self.temp_policy_path
         )
+
+        net_compet_threshold = self.benchmark_competition_settings.net_compet_threshold
         compet_freq = self.benchmark_competition_settings.compet_freq
 
         for gen in range(generations):
@@ -103,7 +111,7 @@ class AlphaZeroTraining:
                     temp,
                     dir_eps,
                     dir_alpha,
-                    dirichlet_enabled=False,
+                    dirichlet_enabled=dir_enabled,
                 )
                 for exp in new_exp:
                     for _ in range(data_augmentation_times):
@@ -163,18 +171,24 @@ class AlphaZeroTraining:
         benchmark_rounds = self.benchmark_competition_settings.benchmark_rounds
         mcts_iterations = self.benchmark_competition_settings.mcts_iterations
         mcts_random_moves = self.benchmark_competition_settings.mcts_random_moves
+        reversed = False
+        scores = 0
+        scores_list = []
 
         if benchmark_freq != 0 and (gen + 1) % benchmark_freq == 0:
-            scores1 = match_net_mcts(
-                self.policy,
-                self.game_settings,
-                benchmark_rounds,
-                mcts_iterations,
-                mcts_random_moves,
-            )
-            # scores2 = match_mcts_net(self.policy, self.game_settings)
-            # scores = scores1 + scores2
-            return scores1
+            for round_n in range(benchmark_rounds):
+                if round_n > benchmark_rounds / 2 -1 :
+                    reversed = True
+                score = match_net_mcts(
+                    self.game_settings,
+                    self.benchmark_competition_settings,
+                    inverse_order = reversed
+                )
+                scores_list.append(score)
+                scores += score
+            
+            print ("All scores = {}".format(scores_list))
+            return scores
 
     def data_augmentation(self, exp):
 

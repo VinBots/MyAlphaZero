@@ -2,7 +2,7 @@ import csv
 
 
 class LogData:
-    def __init__(self, folder="monitoring", filename_grads="grads.csv"):
+    def __init__(self, folder="../monitoring", filename_grads="grads.csv"):
         """
         filename = "data.csv", , filename_buffer = "data_buffer.csv", filename_compet = "comp_scores_data.csv"
 

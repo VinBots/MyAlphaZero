@@ -1,28 +1,27 @@
 import random
 from copy import copy
 
-
 import torch
 import numpy as np
 
 import games_mod  # Games
-import plain_mcts
 import mcts
 import policy_mod  # neural network
+from oracles import roll_out
 
 
 def play_mcts(agent, iterations):
+    orac_params = {"nb_roll_out":1}
     for _ in range(iterations):
-        agent.explore()
-    agent = agent.next(temperature=0.01)
-    return agent.game.last_move
-
+        agent.explore(orac_params)
+    next_pos, (_, _, p) = agent.next(temperature=0.01)
+    #print ("Probs = {}".format(p))
+    return next_pos.game.last_move
 
 def network_only(game_state, play_settings=None, policy_path="ckp/ai_ckp.pth"):
     """
     Returns the best move (highest probability) output by the network
     """
-
     policy = policy_mod.Policy(policy_path)
     policy.load_weights(policy_path)
     board = torch.tensor(game_state).type(torch.FloatTensor).unsqueeze(0).unsqueeze(0)
@@ -32,33 +31,51 @@ def network_only(game_state, play_settings=None, policy_path="ckp/ai_ckp.pth"):
     return np.unravel_index(np.argmax(prob_array, axis=None), prob_array.shape)
 
 
-def match_net_mcts(
-    policy, game_settings, benchmark_rounds, mcts_iterations, mcts_random_moves
-):
+def net_player (game, **kwargs):
+    #print ("Net is playing {}".format(game.player))
+    return network_only(game.player * game.state)
+
+def mcts_player(game, **kwargs):
+    turn = kwargs["turn"]
+    benchmark_competition_settings = kwargs["settings"]
+    mcts_random_moves = benchmark_competition_settings.mcts_random_moves
+    mcts_iterations = benchmark_competition_settings.mcts_iterations
+
+    if turn < mcts_random_moves * 2:
+        next_move = random.choice(new_game.available_moves())
+    else:
+        agent2 = mcts.Node(game, oracle = roll_out)
+        next_move = play_mcts(agent2, mcts_iterations)
+    return next_move
+
+def match_net_mcts(game_settings, benchmark_competition_settings, inverse_order = False):
 
     scores = 0
-    draw_score = benchmark_rounds * 1
-    for _ in range(benchmark_rounds):
-        new_game = games_mod.ConnectN(game_settings)
-        turn = 0
-        while new_game.score is None:
-            if turn % 2 == 0:
-                next_move = network_only(new_game.state)
-                new_game.move(next_move)
-            else:
-                if turn < mcts_random_moves * 2:
-                    new_game.move(random.choice(new_game.available_moves()))
-                else:
-                    agent2 = plain_mcts.Node(new_game)
-                    new_game.move(play_mcts(agent2, mcts_iterations))
-            turn += 1
+    inv_score = 1
+    if inverse_order:
+        inv_score = -1    
+    new_game = games_mod.ConnectN(game_settings)
+    players = [net_player, mcts_player]
+    if inverse_order:
+        players = [mcts_player, net_player]
+    turn = 0
 
-        scores += new_game.score + 1
-        # print (turn, new_game.score)
-        del new_game
+    while new_game.score is None:
+        #print (new_game.state)
+        if turn % 2 == 0:
+            active_player = players[0]
+        else:
+            active_player = players[1]
+        params = {"turn": turn, "settings":benchmark_competition_settings}
+        next_move = active_player(new_game, **params)
+        new_game.move(next_move)
+        turn += 1
+    #print ("game score is {}".format(new_game.score))
+    scores = inv_score * new_game.score + 1
 
-    return scores / draw_score
-
+    del new_game
+    #print (scores)
+    return scores
 
 def policy_player_mcts(game, play_settings=None, policy_path="ckp/ai_ckp.pth"):
     """to do"""
