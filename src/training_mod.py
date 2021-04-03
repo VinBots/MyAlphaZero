@@ -133,7 +133,6 @@ class AlphaZeroTraining:
                     # print ("Network replaced")
 
             scores = self.benchmark(gen)
-            # print ("GEN : {} scores is {}".format(gen, scores))
             if scores:
                 self.log_data.save_data("compet", gen, [scores])
 
@@ -162,18 +161,12 @@ class AlphaZeroTraining:
     def benchmark(self, gen):
         """
         Measures the performance of the network against a plain MCTS
-
-        #################IMPROVEMENTS###################
-         - simulation of both player 1 and player 2
         """
 
         benchmark_freq = self.benchmark_competition_settings.benchmark_freq
         benchmark_rounds = self.benchmark_competition_settings.benchmark_rounds
-        mcts_iterations = self.benchmark_competition_settings.mcts_iterations
-        mcts_random_moves = self.benchmark_competition_settings.mcts_random_moves
         reversed = False
         scores = 0
-        scores_list = []
 
         if benchmark_freq != 0 and (gen + 1) % benchmark_freq == 0:
             for round_n in range(benchmark_rounds):
@@ -184,11 +177,8 @@ class AlphaZeroTraining:
                     self.benchmark_competition_settings,
                     inverse_order = reversed
                 )
-                scores_list.append(score)
                 scores += score
-            
-            print ("All scores = {}".format(scores_list))
-            return scores
+            return scores / benchmark_rounds
 
     def data_augmentation(self, exp):
 

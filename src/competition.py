@@ -42,7 +42,7 @@ def mcts_player(game, **kwargs):
     mcts_iterations = benchmark_competition_settings.mcts_iterations
 
     if turn < mcts_random_moves * 2:
-        next_move = random.choice(new_game.available_moves())
+        next_move = random.choice(game.available_moves())
     else:
         agent2 = mcts.Node(game, oracle = roll_out)
         next_move = play_mcts(agent2, mcts_iterations)
@@ -74,7 +74,6 @@ def match_net_mcts(game_settings, benchmark_competition_settings, inverse_order 
     scores = inv_score * new_game.score + 1
 
     del new_game
-    #print (scores)
     return scores
 
 def policy_player_mcts(game, play_settings=None, policy_path="ckp/ai_ckp.pth"):
@@ -130,39 +129,3 @@ def match_ai(game_settings, play_settings, player1_func, player2_func, total_rou
         scores += score
 
     return scores
-
-
-"""
-def match_mcts_net(policy, game_settings):
-    
-    num_matches = 50
-    scores = 0
-    for _ in range(num_matches):
-
-        new_game = games_mod.ConnectN(game_settings)
-
-        turn = 0
-        #seq_states = []
-
-        while new_game.score is None:
-            #print (new_game.state)
-
-            if turn % 2 == 1:
-                next_move = network_only(-new_game.state)
-                new_game.move(next_move)
-            else:
-                if turn >=10 :
-                    new_game.move(random.choice(new_game.available_moves()))
-                else:
-                    agent2 = plain_mcts.Node(new_game)
-                    new_game.move (play_mcts(agent2, 1000))
-            turn +=1
-
-        scores += new_game.score - 1
-        #print (turn, new_game.score)
-            
-        del new_game
-    
-    #print (scores)
-    return -scores
-"""
