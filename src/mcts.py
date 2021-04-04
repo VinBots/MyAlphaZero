@@ -60,7 +60,7 @@ class Node:
 
         self.child = child
 
-    def explore(self, orac_params, dir_eps = 0.25, dir_alpha = 2.0, dirichlet_enabled=True):
+    def explore(self, orac_params, dir_eps = 0.25, dir_alpha = 2.0, dirichlet_enabled=False):
         """
         Implements the expansion, simulation and backpropagation steps
         This method should be further split
