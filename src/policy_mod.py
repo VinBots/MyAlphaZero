@@ -149,7 +149,6 @@ class Policy(nn.Module):
         """
         Saves the network checkpoints
         """
-
         full_path = self.nn_training_settings.ckp_folder + "/" + self.path
         torch.save(self.state_dict(), full_path)
 
@@ -157,7 +156,8 @@ class Policy(nn.Module):
         """
         Loads weights of the network saved in path
         """
-        self.load_state_dict(torch.load(path))
+        full_path = self.nn_training_settings.ckp_folder + "/" + path
+        self.load_state_dict(torch.load(full_path))
 
     def legal_actions_mask(self, x):
         """
