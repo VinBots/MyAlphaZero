@@ -6,7 +6,9 @@ from tqdm import trange
 import mcts
 import games_mod
 from log_data import LogData
-from competition import match_net_mcts, match_ai, policy_player_mcts, net_player, mcts_player
+from competition import match_net_mcts, net_player, mcts_player
+# Implementation 2 for comapring network performances - see net_compet
+# from competition import match_ai, policy_player_mcts 
 import policy_mod
 from oracles import roll_out, nn_infer
 
@@ -89,6 +91,7 @@ class AlphaZeroTraining:
             self.nn_training_settings, 
             self.log_data
             )
+        temp_policy.save_weights()
         net_compet_threshold = self.benchmark_competition_settings.net_compet_threshold
         compet_freq = self.benchmark_competition_settings.compet_freq
 
@@ -214,7 +217,6 @@ class AlphaZeroTraining:
         #################IMPROVEMENTS###################
          - review symetries 5 and 6
         """
-
         # transformations
         t0 = lambda x: x
         t1 = lambda x: x[:, ::-1].copy()
@@ -225,7 +227,6 @@ class AlphaZeroTraining:
         t5 = lambda x: x[:, ::-1].T.copy()
         t6 = lambda x: x[::-1, :].T.copy()
         t7 = lambda x: x[::-1, ::-1].T.copy()
-
         tlist = [t0, t1, t2, t3, t4, t7]
         tlist_half = [t0, t1, t2, t3]
 
@@ -239,7 +240,6 @@ class AlphaZeroTraining:
         t5inv = lambda x: self.flip(x, 1).t()
         t6inv = lambda x: self.flip(x, 0).t()
         t7inv = lambda x: self.flip(self.flip(x, 0), 1).t()
-
         tinvlist = [t0inv, t1inv, t2inv, t3inv, t4inv, t7inv]
         transformation_list = list(zip(tlist, tinvlist))
         return transformation_list

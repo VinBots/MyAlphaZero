@@ -15,7 +15,6 @@ def play_mcts(agent, iterations):
     for _ in range(iterations):
         agent.explore(orac_params)
     next_pos, (_, _, p) = agent.next(temperature=0.01)
-    #print ("Probs = {}".format(p))
     return next_pos.game.last_move
 
 def network_only(game_state, policy_path, nn_training_settings):
@@ -23,7 +22,6 @@ def network_only(game_state, policy_path, nn_training_settings):
     Returns the best move (highest probability) output by the network
     """
     policy = policy_mod.Policy(policy_path, nn_training_settings)
-    #print (policy_path)
     policy.load_weights(policy_path)
     board = torch.tensor(game_state).type(torch.FloatTensor).unsqueeze(0).unsqueeze(0)
     v, prob = policy.forward_batch(board)
@@ -32,7 +30,6 @@ def network_only(game_state, policy_path, nn_training_settings):
     return np.unravel_index(np.argmax(prob_array, axis=None), prob_array.shape)
 
 def net_player (game, **kwargs):
-    #print ("Net is playing {}".format(game.player))
     policy_path = kwargs["params"]["policy_path"]
     nn_training_settings = kwargs["params"]["nn_training_settings"]
     return network_only(game.player * game.state, policy_path, nn_training_settings)
@@ -77,7 +74,7 @@ def match_net_mcts(game_settings, benchmark_competition_settings, **kwargs):
         turn += 1
     scores = inv_score * new_game.score + 1
     return scores
-
+'''
 def policy_player_mcts(game, play_settings=None, policy_path="ckp/ai_ckp.pth"):
     """to do"""
 
@@ -112,8 +109,6 @@ def match_ai(game_settings, play_settings, player1_func, player2_func, total_rou
         score = None
 
         while score is None:
-            # print (game.state)
-            game_state = player_turn * game.state
             loc = curr_player(game, play_settings, path)
 
             succeed = game.move(loc)
@@ -131,3 +126,4 @@ def match_ai(game_settings, play_settings, player1_func, player2_func, total_rou
         scores += score
 
     return scores
+'''
