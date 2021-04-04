@@ -25,7 +25,6 @@ class ReplayBuffer:
         self.batch_size = batch_size
         self.log_data = log_data
         self.seed = random.seed(seed)
-
         self.memory = {}
         self.all_fields_names = ["v", "p", "count_exp"]
         self.record_length = len(self.all_fields_names)
@@ -52,6 +51,7 @@ class ReplayBuffer:
         """
         Randomly samples a batch of experiences from memory
         """
+
         experiences = random.sample(self.memory.items(), k=self.batch_size)
         return experiences
 
@@ -67,27 +67,26 @@ class ReplayBuffer:
                 if e is not None
             ]
         )
-
         all_v = torch.stack(
             [torch.tensor([e[1][0]], dtype=torch.float, device=device) for e in samples]
         )
-
         all_p = torch.stack([e[1][1] for e in samples])
-
         return (all_states, all_v, all_p)
 
     def buffer_len(self):
         """Return the current size of the buffer."""
+
         return len(self.memory)
 
     def dist_outcomes(self):
         """
+        Returns stats about the content of the buffer
         There must be a bette way...
         """
+
         wins = 0
         losses = 0
         draws = 0
-
         for _, v in self.memory.items():
             if v[0] > 0:
                 wins += 1
@@ -98,6 +97,9 @@ class ReplayBuffer:
         return [wins, losses, draws]
 
     def deduplicate(self, exp):
+        """
+        Averages v and p for positions already present in the buffer
+        """
 
         if exp[0] in self.memory:
             existing_v, existing_p, existing_count = self.memory[exp[0]]
@@ -107,7 +109,6 @@ class ReplayBuffer:
                 self.average_v_p(exp[2], existing_p, existing_count + 1),
                 existing_count + 1,
             )
-
         else:
             self.add_keys(exp[0])
             self.memory[exp[0]] = (exp[1], exp[2], 1)
@@ -116,9 +117,13 @@ class ReplayBuffer:
         return x2 + (x1 - x2) / count_num
 
     def remove_keys(self):
+        """Removes items from the buffer if its size exceeds the target limit"""
+
         while len(self.memory) > self.buffer_size_target:
             self.memory.pop(self.save_keys_list[0])
             self.save_keys_list.pop(0)
 
     def add_keys(self, key_value):
+        """Stores the position in the buffer in the save_keys_list"""
+
         self.save_keys_list.append(key_value)

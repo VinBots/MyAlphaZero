@@ -8,7 +8,6 @@ import torch
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-
 class Node:
     """
     Implements the MCTS by building a search tree.
@@ -20,16 +19,18 @@ class Node:
     create_child() creates self.child by iterating over possible actions from a given node
     """
 
-    def __init__(self, game, mother=None, prob=torch.tensor(0.0, dtype=torch.float)):
+    def __init__(self, game, oracle = None, mother=None, prob=torch.tensor(0.0, dtype=torch.float)):
         self.game = game
+        self.oracle = oracle
+        self.mother = mother
+        self.prob = prob
+ 
         self.child = {}
         self.U = 0
-
         self.U_sa = 0
         self.Q_sa = 0
         self.W_sa = 0
 
-        self.prob = prob
         self.nn_v = torch.tensor(0.0, dtype=torch.float)
         self.N = 0
         self.V = 0
@@ -41,7 +42,7 @@ class Node:
             self.V = self.game.score * self.game.player
             self.U = 0 if self.game.score is 0 else self.V * float("inf")
         # link to previous node
-        self.mother = mother
+        
 
     def create_child(self, actions, probs):
         """
@@ -52,10 +53,14 @@ class Node:
         for action, game in zip(actions, games):
             game.move(action)
 
-        child = {tuple(a): Node(g, self, p) for a, g, p in zip(actions, games, probs)}
+        if probs is not None:
+            child = {tuple(a): Node(g, oracle = self.oracle, mother = self, prob = p) for a, g, p in zip(actions, games, probs)}
+        else:
+            child = {tuple(a): Node(g, oracle = self.oracle, mother = self) for a, g in zip(actions, games)}
+
         self.child = child
 
-    def explore(self, policy, dir_eps, dir_alpha, dirichlet_enabled=False):
+    def explore(self, orac_params, dir_eps = 0.25, dir_alpha = 2.0, dirichlet_enabled=False):
         """
         Implements the expansion, simulation and backpropagation steps
         This method should be further split
@@ -93,23 +98,14 @@ class Node:
             # policy outputs results from the perspective of the next player
             # thus extra - sign is needed
 
-            input = (
-                torch.tensor(
-                    current.game.state * current.game.player,
-                    dtype=torch.float,
-                    device=device,
-                )
-                .unsqueeze(0)
-                .unsqueeze(0)
-            )
+            v, probs = self.oracle(current.game, **orac_params)
+            current.V = -v
 
-            v, probs = policy.forward_batch(input, dim_value=0)
-            current.V = -float(v.squeeze().squeeze())
-
-            mask = torch.tensor(current.game.available_mask())
-            probs = self.normalize(probs.view(3, 3)[mask].view(-1))
-            if dirichlet_enabled:
-                probs = self.dirichlet_noise(probs, dir_eps, dir_alpha)
+            if probs is not None:
+                mask = torch.tensor(current.game.available_mask())
+                probs = self.normalize(probs.view(3, 3)[mask].view(-1))
+                if dirichlet_enabled and not current.mother:
+                    probs = self.dirichlet_noise(probs, dir_eps, dir_alpha)
 
             next_actions = current.game.available_moves()
             current.create_child(next_actions, probs)
@@ -126,9 +122,12 @@ class Node:
             # update U for all sibling nodes
             for sibling in mother.child.values():
                 if sibling.U is not float("inf") and sibling.U is not -float("inf"):
-                    sibling.U = sibling.V + self.c_puct * float(sibling.prob) * sqrt(
-                        mother.N
-                    ) / (1 + sibling.N)
+                    if sibling.prob:
+                        prior = float(sibling.prob)
+                    else:
+                        prior = 1
+
+                    sibling.U = sibling.V + self.c_puct * prior * sqrt(mother.N) / (1 + sibling.N)
             current = current.mother
 
     def next(self, temperature=1.0):
@@ -161,19 +160,13 @@ class Node:
                 [(node.N / totalN) for node in child.values()],
                 device=device,
             )
-
             prob_choice = torch.tensor(
                 [(node.N / totalN) ** (1 / temperature) for node in child.values()],
                 device=device,
             )
-
         prob = self.normalize(prob)
-        prob_choice = self.normalize(prob_choice)
-
-        nn_prob = torch.stack([node.prob for node in child.values()]).to(device)
-
+        prob_choice = self.normalize(prob_choice)        
         nextstate = random.choices(list(child.values()), weights=prob_choice)[0]
-
         prob = self.game.unmask(prob)
 
         return nextstate, (new_state, -self.V, prob)
