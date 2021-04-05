@@ -6,7 +6,6 @@ Please refer to docs/ai_lessons for status update
 
 **Future works:**
 
-* 
 * Learn about asynchronous MCTS
 * Look at the use of a profiler
 * Adjust the v value to reward faster wins v = win/loss * f_penalty (number of turns played - minimum)
