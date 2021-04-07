@@ -29,11 +29,11 @@ nn_training_settings = DotDict({
     "load_policy": False,
     "policy_path": "ai_ckp.pth",
     "ckp_folder":"../ckp",
-    "lr": .005, 
+    "lr": .005,
     "weight_decay": 1.e-4,
     "buffer_size_target": 1000,
     "n_epochs": 1,
-    "batch_size": 50
+    "batch_size": 32
 })
 # set compet_freq at 0 for disabling the competition between current and trained network. 
 # In this case the trained network replaces the current network at every generation
@@ -44,7 +44,7 @@ benchmark_competition_settings = DotDict({
     "net_compet_threshold": 0.0,
     "benchmark_freq": 5,
     "benchmark_rounds": 50,
-    "mcts_iterations": 1000,
+    "mcts_iterations": 500,
     "mcts_random_moves":0
 })
 

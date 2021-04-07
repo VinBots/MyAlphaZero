@@ -47,7 +47,7 @@ def mcts_player(game, **kwargs):
         next_move = play_mcts(agent2, mcts_iterations)
     return next_move
 
-def match_net_mcts(game_settings, benchmark_competition_settings, **kwargs):
+def match_net_mcts(game_settings, benchmark_competition_settings, arr, round_n, **kwargs):
 
     player1 = kwargs["player1"]
     player2 = kwargs["player2"]
@@ -73,7 +73,7 @@ def match_net_mcts(game_settings, benchmark_competition_settings, **kwargs):
         new_game.move(next_move)
         turn += 1
     scores = inv_score * new_game.score + 1
-    return scores
+    arr[round_n] = scores
 '''
 def policy_player_mcts(game, play_settings=None, policy_path="ckp/ai_ckp.pth"):
     """to do"""

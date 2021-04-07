@@ -7,8 +7,8 @@ import training_mod #neural network training
 from replay_buffer_dict import ReplayBuffer #centralized buffer
 from log_data import LogData #logging class for monitoring purposes
 
-if __name__ == "__main__":
-
+def main():
+    
     log_data = LogData()
     log_data.add_chart("nn_loss", ["nn_loss.csv", ['iter', 'loss', 'value_loss', 'prob_loss']])
     log_data.add_chart("buffer", ["buffer.csv", ['iter', 'wins', 'losses', 'draws']])
@@ -38,3 +38,8 @@ if __name__ == "__main__":
     t1 = time.time()
 
     print ("Total time (in sec): {}".format(t1 - t0))
+
+if __name__ == "__main__":
+    main()
+
+    

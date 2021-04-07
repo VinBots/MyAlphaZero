@@ -1,8 +1,12 @@
 import numpy as np
 import random
 import torch
-from tqdm import trange
+import time
+import multiprocessing
+from functools import partial
 
+
+from tqdm import trange
 import mcts
 import games_mod
 from log_data import LogData
@@ -16,7 +20,9 @@ from oracles import roll_out, nn_infer
 def execute_self_play(
     game_settings,
     mcts_settings,
-    policy
+    policy,
+    return_dict, 
+    procnum
     ):
     """
     Starts with an empty board and runs MCTS for every node traversed.
@@ -40,8 +46,7 @@ def execute_self_play(
         mytree.detach_mother()
         outcome = mytree.outcome
 
-    return [(m[0], m[2] * outcome, m[1]) for m in memory]
-
+    return_dict[procnum] = [(m[0], m[2] * outcome, m[1]) for m in memory]
 
 class AlphaZeroTraining:
     """
@@ -96,15 +101,56 @@ class AlphaZeroTraining:
         compet_freq = self.benchmark_competition_settings.compet_freq
 
         for gen in trange(generations, desc = 'Generations'):
-            for _ in range(self_play_iterations):
-                new_exp = execute_self_play(
-                    self.game_settings,
-                    self.mcts_settings,
-                    self.policy,
-                )
+            '''
+            call_back_func = partial(
+                add_to_buffer, 
+                buffer=buffer, 
+                data_augmentation_times = data_augmentation_times, 
+                data_augmentation = self.data_augmentation)
+            
+            
+            pool = multiprocessing.Pool (processes = 4)
+            for i in range(self_play_iterations):
+                result = pool.apply_async (
+                    execute_self_play,
+                    args = (
+                        self.game_settings,
+                        self.mcts_settings,
+                        self.policy), 
+                    callback = call_back_func)
+                #print (result.get())
+            pool.close()
+            pool.join()
+
+            '''
+            manager = multiprocessing.Manager()
+            return_dict = manager.dict()
+            jobs = []
+
+            for i in range(self_play_iterations):
+                p = multiprocessing.Process (
+                    target = execute_self_play, 
+                    args = (
+                        self.game_settings,
+                        self.mcts_settings,
+                        self.policy,
+                        return_dict,
+                        i)
+                        ) 
+                jobs.append(p)
+                p.start()                
+            
+            for p in jobs:
+                p.join()
+            
+            #start = time.perf_counter()
+            for i in range(self_play_iterations):
+                new_exp = return_dict.values()[i]
                 for exp in new_exp:
                     for _ in range(data_augmentation_times):
                         buffer.add(self.data_augmentation(exp))
+            #end = time.perf_counter()
+            #print ("Time for adding to buffer {} seconds".format(end - start))
 
             if buffer.buffer_len() == buffer.buffer_size_target:
                 losses = temp_policy.nn_train(buffer, batch_size)
@@ -119,7 +165,7 @@ class AlphaZeroTraining:
                 if (update_net) or (compet_freq == 0):
                     self.policy.load_weights(self.temp_policy_path)
                     self.policy.save_weights()
-                    print ("Network replaced at generation {}".format(gen))
+                    #print ("Network replaced at generation {}".format(gen))
 
             scores = self.benchmark(gen)
             if scores:
@@ -178,22 +224,29 @@ class AlphaZeroTraining:
         benchmark_freq = self.benchmark_competition_settings.benchmark_freq
         benchmark_rounds = self.benchmark_competition_settings.benchmark_rounds
         reversed = False
-        scores = 0
         p1_params = {"policy_path": self.temp_policy_path, "nn_training_settings": self.nn_training_settings}
         p2_params = {}
 
         if benchmark_freq != 0 and (gen + 1) % benchmark_freq == 0:
+            
+            arr = multiprocessing.Array('i', benchmark_rounds)
+            jobs = []
+
             for round_n in range(benchmark_rounds):
                 if round_n > benchmark_rounds / 2 -1 :
                     reversed = True
                 match_params = {"player1": [net_player, p1_params], "player2": [mcts_player, p2_params], "inverse_order": reversed}
-                score = match_net_mcts(
-                    self.game_settings,
-                    self.benchmark_competition_settings,
-                    **match_params
-                )
-                scores += score
-            return scores / benchmark_rounds
+                p = multiprocessing.Process(target = match_net_mcts, args = (
+                    self.game_settings, 
+                    self.benchmark_competition_settings, 
+                    arr, 
+                    round_n), kwargs = match_params)
+                jobs.append(p)
+                p.start()                
+            
+            for p in jobs:
+                p.join()
+            return np.array(arr).sum() / benchmark_rounds
 
     def data_augmentation(self, exp):
 
@@ -213,22 +266,18 @@ class AlphaZeroTraining:
     def transformations(self):
         """
         Returns a list of transformation functions for exploiting symetries
-
-        #################IMPROVEMENTS###################
-         - review symetries 5 and 6
         """
+
         # transformations
         t0 = lambda x: x
         t1 = lambda x: x[:, ::-1].copy()
         t2 = lambda x: x[::-1, :].copy()
         t3 = lambda x: x[::-1, ::-1].copy()
         t4 = lambda x: x.T
-        # TO DO
         t5 = lambda x: x[:, ::-1].T.copy()
         t6 = lambda x: x[::-1, :].T.copy()
         t7 = lambda x: x[::-1, ::-1].T.copy()
-        tlist = [t0, t1, t2, t3, t4, t7]
-        tlist_half = [t0, t1, t2, t3]
+        tlist = [t0, t1, t2, t3, t4, t5, t6, t7]
 
         # inverse transformations
         t0inv = lambda x: x
@@ -236,10 +285,9 @@ class AlphaZeroTraining:
         t2inv = lambda x: self.flip(x, 0)
         t3inv = lambda x: self.flip(self.flip(x, 0), 1)
         t4inv = lambda x: x.t()
-        # TO DO
         t5inv = lambda x: self.flip(x, 1).t()
         t6inv = lambda x: self.flip(x, 0).t()
         t7inv = lambda x: self.flip(self.flip(x, 0), 1).t()
-        tinvlist = [t0inv, t1inv, t2inv, t3inv, t4inv, t7inv]
+        tinvlist = [t0inv, t1inv, t2inv, t3inv, t4inv, t5inv, t6inv, t7inv]
         transformation_list = list(zip(tlist, tinvlist))
         return transformation_list
