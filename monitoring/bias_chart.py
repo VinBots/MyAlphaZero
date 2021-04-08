@@ -10,10 +10,17 @@ def bias(i):
     y_list = [data["pos"+str(i)] for i in range(1, 10)]
 
     plt.cla()
-    #plt.plot(x, y_list[4], label="pos" + str(i))
+    plt.plot(x, y_list[0], label="Top left")
+    plt.plot(x, y_list[1], label="Top")
+    plt.plot(x, y_list[2], label="Top right")
+    plt.plot(x, y_list[3], label="Middle left") 
+    plt.plot(x, y_list[4], label="Middle")
+    plt.plot(x, y_list[5], label="Middle right") 
+    plt.plot(x, y_list[6], label="Bottom left")
+    plt.plot(x, y_list[7], label="Bottom")
+    plt.plot(x, y_list[8], label="Bottom right")
 
-    for i in range(9):
-        plt.plot(x, y_list[i], label="pos" + str(i))
+    
     
     plt.legend(loc="lower right")
     plt.tight_layout()

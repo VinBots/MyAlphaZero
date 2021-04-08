@@ -73,6 +73,7 @@ class ConnectN:
         self.size = args.board_size
         self.w, self.h = self.size
         self.N = args.N
+        self.discount_enabled = args.discount_enabled
 
         # make sure game is well defined
         if (
@@ -91,6 +92,7 @@ class ConnectN:
         self.player = 1
         self.last_move = None
         self.n_moves = 0
+        
         # self.switched_side = False
 
     # fast deepcopy
@@ -122,7 +124,11 @@ class ConnectN:
         # loop over each possibility
         for line in [ver, hor, diag_right, diag_left]:
             if in_a_row(line, self.N, self.player):
-                return self.player
+                if self.discount_enabled:
+                    discount = 0.9 ** (np.abs(self.state).sum() - 5)
+                    return self.player * discount
+                else:
+                    return self.player
 
         # no more moves
         if np.all(self.state != 0):

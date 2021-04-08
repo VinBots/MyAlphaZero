@@ -229,7 +229,7 @@ class AlphaZeroTraining:
 
         if benchmark_freq != 0 and (gen + 1) % benchmark_freq == 0:
             
-            arr = multiprocessing.Array('i', benchmark_rounds)
+            arr = multiprocessing.Array('f', benchmark_rounds)
             jobs = []
 
             for round_n in range(benchmark_rounds):

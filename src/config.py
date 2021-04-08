@@ -3,7 +3,8 @@ from utils import DotDict #other utilities
 # Game settings
 game_settings = DotDict({
     "board_size": (3,3),
-    "N": 3
+    "N": 3,
+    "discount_enabled": False
 })
 
 # Self-play training settings
