@@ -11,7 +11,7 @@ def competition(i):
 
     plt.cla()
     plt.axhline(y = 1.0, label = 'benchmark', color = 'r', linestyle = 'dashed')
-    plt.plot(x, y1, label="Network vs. MCTS 1000", color = 'g')
+    plt.plot(x, y1, label="Network vs. MCTS 500", color = 'g')
     plt.legend(loc="lower right")
     plt.tight_layout()
 
