@@ -28,6 +28,7 @@ class Policy(nn.Module):
         # layers for the policy function
         self.fc_action1 = nn.Linear(32, 16)
         self.fc_action2 = nn.Linear(16, 9)
+        nn.init.constant_(self.fc_action2.bias, 0)
 
         # layers for the value function
         self.fc_value1 = nn.Linear(32, 8)

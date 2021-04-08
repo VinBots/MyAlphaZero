@@ -6,6 +6,7 @@ import games_mod # Games
 import training_mod #neural network training
 from replay_buffer_dict import ReplayBuffer #centralized buffer
 from log_data import LogData #logging class for monitoring purposes
+import cProfile
 
 def main():
     
@@ -13,6 +14,8 @@ def main():
     log_data.add_chart("nn_loss", ["nn_loss.csv", ['iter', 'loss', 'value_loss', 'prob_loss']])
     log_data.add_chart("buffer", ["buffer.csv", ['iter', 'wins', 'losses', 'draws']])
     log_data.add_chart("compet", ["compet.csv",['iter', 'scores']])
+    log_data.add_chart("bias_action", ["bias_action.csv",['iter', 'pos1', 'pos2', 'pos3', 'pos4', 'pos5', 'pos6', 'pos7', 'pos8', 'pos9']])
+
     game=games_mod.ConnectN(config.game_settings)
 
     policy = policy_mod.Policy(config.nn_training_settings.policy_path, 

@@ -59,14 +59,20 @@ class LogData:
         ave_grads = []
         max_grads = []
         min_grads = []
+        biases = []
         for n, p in named_parameters:
-            if (p.requires_grad) and ("bias" not in n):
-                ave_grads.append(float(p.grad.abs().mean()))
-                max_grads.append(float(p.grad.abs().max()))
-                min_grads.append(float(p.grad.abs().min()))
+            if (p.requires_grad):
+                if "fc_action2.bias" in n:
+                    self.save_data("bias_action", iter_number, p.tolist())
+                else:
+                    ave_grads.append(float(p.grad.abs().mean()))
+                    max_grads.append(float(p.grad.abs().max()))
+                    min_grads.append(float(p.grad.abs().min()))
+
         stored_values = [iter_number] + ave_grads + max_grads + min_grads
         filename = self.folder + "/" + self.filename_grads
         with open(filename, "a") as csv_file:
             csv_writer = csv.DictWriter(csv_file, fieldnames=self.fieldnames_grads)
             info = {k: v for (k, v) in zip(self.fieldnames_grads, stored_values)}
             csv_writer.writerow(info)
+    

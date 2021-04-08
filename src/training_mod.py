@@ -100,7 +100,7 @@ class AlphaZeroTraining:
         net_compet_threshold = self.benchmark_competition_settings.net_compet_threshold
         compet_freq = self.benchmark_competition_settings.compet_freq
 
-        for gen in trange(generations, desc = 'Generations'):
+        for gen in range(generations): #trange(generations, desc = 'Generations'):
             '''
             call_back_func = partial(
                 add_to_buffer, 
