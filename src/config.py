@@ -9,7 +9,7 @@ game_settings = DotDict({
 
 # Self-play training settings
 game_training_settings = DotDict({
-    "generations": 100,
+    "generations": 5,
     "self_play_iterations": 50,
     "data_augmentation_times": 1
 })

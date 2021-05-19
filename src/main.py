@@ -7,6 +7,7 @@ import training_mod #neural network training
 from replay_buffer_dict import ReplayBuffer #centralized buffer
 from log_data import LogData #logging class for monitoring purposes
 import cProfile
+from utils import DotDict
 
 def main():
     
@@ -28,8 +29,15 @@ def main():
                         log_data)
 
     t0 = time.time()
+    game_settings = DotDict({
+        "board_size": (3,3),
+        "N": 3,
+        "discount_enabled": False
+    })
+
+    
     alpha_0 = training_mod.AlphaZeroTraining(
-        config.game_settings, 
+        game_settings, 
         config.game_training_settings,
         config.mcts_settings,
         config.nn_training_settings,

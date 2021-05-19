@@ -6,7 +6,8 @@ import time
 import numpy as np
 import torch
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+#device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = "cpu"
 
 class Node:
     """
@@ -102,7 +103,7 @@ class Node:
             current.V = -v
 
             if probs is not None:
-                mask = torch.tensor(current.game.available_mask())
+                mask = torch.tensor(current.game.available_mask(), dtype = torch.bool)
                 probs = self.normalize(probs.view(3, 3)[mask].view(-1))
                 if dirichlet_enabled and not current.mother:
                     probs = self.dirichlet_noise(probs, dir_eps, dir_alpha)

@@ -8,8 +8,8 @@ from collections import namedtuple, deque
 import torch
 import numpy as np
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
+#device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = "cpu"
 
 class ReplayBuffer:
     """Fixed-size buffer to store experience tuples."""
@@ -29,7 +29,8 @@ class ReplayBuffer:
         self.all_fields_names = ["v", "p", "count_exp"]
         self.record_length = len(self.all_fields_names)
         self.experience = namedtuple("Experience", field_names=self.all_fields_names)
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        #self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.device = "cpu"
         self.save_keys_list = []
         self.add_counter = 0
 

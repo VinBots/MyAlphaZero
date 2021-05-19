@@ -98,10 +98,10 @@ class Policy(nn.Module):
                     all_target_p[indices],
                 )
                 optimizer.zero_grad()
-                pred_v, pred_p = self.forward_batch(torch.tensor(states))
+                pred_v, pred_p = self.forward_batch(states)
 
                 loss, value_loss, prob_loss = self.loss_function(
-                    torch.tensor(states), pred_v, pred_p, target_v, target_p
+                    states, pred_v, pred_p, target_v, target_p
                 )
 
                 loss.backward()

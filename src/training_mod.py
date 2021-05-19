@@ -4,7 +4,8 @@ import torch
 import time
 import multiprocessing
 from functools import partial
-
+import dill
+import pickle
 
 from tqdm import trange
 import mcts
@@ -15,15 +16,14 @@ from competition import match_net_mcts, net_player, mcts_player
 # from competition import match_ai, policy_player_mcts 
 import policy_mod
 from oracles import roll_out, nn_infer
+from utils import DotDict
 
+num_processes = 7
 
 def execute_self_play(
     game_settings,
     mcts_settings,
-    policy,
-    return_dict, 
-    procnum
-    ):
+    policy): 
     """
     Starts with an empty board and runs MCTS for every node traversed.
     Experiences are stored in a buffer for the neural network to be trained.
@@ -45,8 +45,7 @@ def execute_self_play(
         memory.append([state * current_player, p, current_player])
         mytree.detach_mother()
         outcome = mytree.outcome
-
-    return_dict[procnum] = [(m[0], m[2] * outcome, m[1]) for m in memory]
+    return [(m[0], m[2] * outcome, m[1]) for m in memory]
 
 class AlphaZeroTraining:
     """
@@ -100,55 +99,28 @@ class AlphaZeroTraining:
         net_compet_threshold = self.benchmark_competition_settings.net_compet_threshold
         compet_freq = self.benchmark_competition_settings.compet_freq
 
-        for gen in range(generations): #trange(generations, desc = 'Generations'):
-            '''
-            call_back_func = partial(
-                add_to_buffer, 
-                buffer=buffer, 
-                data_augmentation_times = data_augmentation_times, 
-                data_augmentation = self.data_augmentation)
-            
-            
-            pool = multiprocessing.Pool (processes = 4)
-            for i in range(self_play_iterations):
-                result = pool.apply_async (
-                    execute_self_play,
-                    args = (
-                        self.game_settings,
-                        self.mcts_settings,
-                        self.policy), 
-                    callback = call_back_func)
-                #print (result.get())
-            pool.close()
-            pool.join()
 
-            '''
+        for gen in range(generations): #trange(generations, desc = 'Generations'):
+            print ("Generation {}".format(gen))
+    
             manager = multiprocessing.Manager()
             return_dict = manager.dict()
             jobs = []
 
-            for i in range(self_play_iterations):
-                p = multiprocessing.Process (
-                    target = execute_self_play, 
-                    args = (
-                        self.game_settings,
-                        self.mcts_settings,
-                        self.policy,
-                        return_dict,
-                        i)
-                        ) 
-                jobs.append(p)
-                p.start()                
-            
-            for p in jobs:
-                p.join()
-            
+            with multiprocessing.Pool (processes=num_processes) as pool:
+                self_play = [pool.apply_async(execute_self_play,
+                args = (
+                    self.game_settings,
+                    self.mcts_settings,
+                    self.policy)) for _ in range(self_play_iterations)]
+                new_exp_res = [res.get() for res in self_play]
             #start = time.perf_counter()
             for i in range(self_play_iterations):
-                new_exp = return_dict.values()[i]
+                new_exp = new_exp_res[i]
                 for exp in new_exp:
                     for _ in range(data_augmentation_times):
                         buffer.add(self.data_augmentation(exp))
+
             #end = time.perf_counter()
             #print ("Time for adding to buffer {} seconds".format(end - start))
 
@@ -158,7 +130,8 @@ class AlphaZeroTraining:
                 temp_policy.save_weights()
 
                 update_net = False
-                improvement_score = self.net_compet(gen)
+                #improvement_score = self.net_compet(gen)
+                improvement_score = 0
                 if improvement_score is not None and improvement_score >= net_compet_threshold:
                     update_net = True
 
@@ -170,7 +143,7 @@ class AlphaZeroTraining:
             scores = self.benchmark(gen)
             if scores:
                 self.log_data.save_data("compet", gen, [scores])
-
+            
     def net_compet(self, gen):
         """
         Implementation 1 (not used for Tic-Tac-Toe): Measures the performance of the improved MCTS-policy
@@ -223,30 +196,23 @@ class AlphaZeroTraining:
 
         benchmark_freq = self.benchmark_competition_settings.benchmark_freq
         benchmark_rounds = self.benchmark_competition_settings.benchmark_rounds
+
         reversed = False
         p1_params = {"policy_path": self.temp_policy_path, "nn_training_settings": self.nn_training_settings}
         p2_params = {}
 
-        if benchmark_freq != 0 and (gen + 1) % benchmark_freq == 0:
-            
-            arr = multiprocessing.Array('f', benchmark_rounds)
+        if benchmark_freq != 0 and (gen + 1) % benchmark_freq == 0:            
             jobs = []
-
-            for round_n in range(benchmark_rounds):
-                if round_n > benchmark_rounds / 2 -1 :
-                    reversed = True
-                match_params = {"player1": [net_player, p1_params], "player2": [mcts_player, p2_params], "inverse_order": reversed}
-                p = multiprocessing.Process(target = match_net_mcts, args = (
-                    self.game_settings, 
-                    self.benchmark_competition_settings, 
-                    arr, 
-                    round_n), kwargs = match_params)
-                jobs.append(p)
-                p.start()                
-            
-            for p in jobs:
-                p.join()
-            return np.array(arr).sum() / benchmark_rounds
+            with multiprocessing.Pool (processes=num_processes) as pool:
+                for round_n in range(benchmark_rounds):
+                    if round_n > benchmark_rounds / 2 -1 :
+                        reversed = True
+                    match_params = {"player1": [net_player, p1_params], "player2": [mcts_player, p2_params], "inverse_order": reversed}
+                    jobs.append(pool.apply_async(
+                        match_net_mcts, (self.game_settings, 
+                            self.benchmark_competition_settings, match_params)))
+                all_jobs = [job.get() for job in jobs]
+            return np.array(all_jobs).sum() / benchmark_rounds
 
     def data_augmentation(self, exp):
 

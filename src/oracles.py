@@ -4,8 +4,8 @@ from copy import copy
 import numpy as np
 import torch
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
+#device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = "cpu"
 def roll_out(game, **kwargs):
     nb_roll_out = kwargs["nb_roll_out"]
     scores = []
