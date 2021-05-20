@@ -51,9 +51,17 @@ def main():
         log_data,
     )
 
+    pol = policy.Policy(
+            path=config.nn_training_settings.policy_path,
+            config = config, 
+            log_data = log_data)
+    pol.save_weights()
+
     t0 = time.time()
     alpha_0 = training.AlphaZeroTraining(
-        config, policy.Policy(config, log_data), log_data
+        config, 
+        pol,
+        log_data
     )
     alpha_0.training_pipeline(buffer)
     t1 = time.time()

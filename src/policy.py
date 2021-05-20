@@ -19,12 +19,12 @@ import matplotlib.pyplot as plt
 
 
 class Policy(nn.Module):
-    def __init__(self, config=None, log_data=None):
+    def __init__(self, path = "ai_ckp.pth", config=None, log_data=None):
         super(Policy, self).__init__()
         # self.config = config
         if config is not None:
             self.nn_training_settings = config.nn_training_settings
-            self.path = config.nn_training_settings.policy_path
+        self.path = path
 
         self.log_data = log_data
 

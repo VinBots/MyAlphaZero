@@ -87,7 +87,7 @@ class AlphaZeroTraining:
             self.config.game_training_settings.data_augmentation_times
         )
         batch_size = self.config.nn_training_settings.batch_size
-        temp_policy = policy.Policy(self.config, self.log_data)
+        temp_policy = policy.Policy(self.temp_policy_path, self.config, self.log_data)
         temp_policy.save_weights()
         net_compet_threshold = (
             self.config.benchmark_competition_settings.net_compet_threshold
@@ -137,11 +137,13 @@ class AlphaZeroTraining:
                     and improvement_score >= net_compet_threshold
                 ):
                     update_net = True
-
                 if (update_net) or (compet_freq == 0):
-                    self.policy.load_weights(self.temp_policy_path)
+                    full_path = (
+                        self.config.nn_training_settings.ckp_folder + "/" + self.temp_policy_path
+                        )
+                    self.policy.load_weights(full_path)
                     self.policy.save_weights()
-                    # print ("Network replaced at generation {}".format(gen))
+                    print ("Network replaced at generation {}".format(gen))
 
             scores = self.benchmark(gen)
             if scores:

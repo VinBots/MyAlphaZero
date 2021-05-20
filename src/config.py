@@ -16,7 +16,10 @@ game_settings = DotDict({"board_size": (3, 3), "N": 3, "discount_enabled": False
 
 # Self-play training settings
 game_training_settings = DotDict(
-    {"generations": 5, "self_play_iterations": 50, "data_augmentation_times": 1}
+    {
+        "generations": 50, 
+        "self_play_iterations": 50, 
+        "data_augmentation_times": 1}
 )
 # alpha = 10 / average legal moves
 # https://medium.com/oracledevs/lessons-from-alphazero-part-3-parameter-tweaking-4dceb78ed1e5
@@ -51,7 +54,7 @@ nn_training_settings = DotDict(
 benchmark_competition_settings = DotDict(
     {
         "compet_freq": 0,
-        "compet_rounds": 2,
+        "compet_rounds": 5,
         "net_compet_threshold": 0.0,
         "benchmark_freq": 5,
         "benchmark_rounds": 50,
