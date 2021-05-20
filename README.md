@@ -1,5 +1,6 @@
 
 # MyAlphaZero
+
 This repository includes an implementation of AlphaZero algorithm applied to the TicTacToe game, based on Deepmind's paper, Mastering the game of Go without human knowledge, published in October 2017.
 
 # Learning Objectives
@@ -8,6 +9,10 @@ This repository includes an implementation of AlphaZero algorithm applied to the
 * Implementation details (e.g. dirichlet noise, masking)
 * Parallel implementations of game generations 
 
+# Credits
+
+* Jonathan Laurent (https://github.com/jonathan-laurent)
+* Udacity Deep Reinforcement Learning Nanodegree (https://github.com/udacity/deep-reinforcement-learning)
 
 # References
 
