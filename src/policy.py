@@ -1,4 +1,16 @@
-import numpy as np
+######################################################
+#
+# AlphaZero algorithm applied to Tic-Tac-Toe
+# written by Vincent Manier (vmanier2020@gmail.com)
+#
+# Neural network module is a simple convolutional
+# neural network that outputs for a given state
+# a state value and a probability distribution
+# for each possible action
+#
+######################################################
+
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -7,9 +19,9 @@ import matplotlib.pyplot as plt
 
 
 class Policy(nn.Module):
-    def __init__(self, config = None, log_data=None):
+    def __init__(self, config=None, log_data=None):
         super(Policy, self).__init__()
-        #self.config = config
+        # self.config = config
         if config is not None:
             self.nn_training_settings = config.nn_training_settings
             self.path = config.nn_training_settings.policy_path

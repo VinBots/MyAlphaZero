@@ -1,3 +1,11 @@
+######################################################
+#
+# Tic-Tac-Toe Game provided by Udacity
+# https://github.com/udacity/deep-reinforcement-learning
+#
+######################################################
+
+
 import time
 from copy import copy
 

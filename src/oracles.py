@@ -1,15 +1,29 @@
+######################################################
+#
+# Tic-Tac-Toe Game provided by Udacity
+# https://github.com/udacity/deep-reinforcement-learning
+#
+# Oracles are used by the MCTS module:
+# roll-out for plain vanilla MCTS
+# nn_infer for MCTS guided by neural network
+#
+######################################################
+
+
 import random
 from copy import copy
 
 import numpy as np
 import torch
 
-#device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 device = "cpu"
+
+
 def roll_out(game, **kwargs):
     nb_roll_out = kwargs["nb_roll_out"]
     scores = []
-    
+
     for _ in range(nb_roll_out):
         sim_game = copy(game)
         while sim_game.score == None:
@@ -20,16 +34,14 @@ def roll_out(game, **kwargs):
     p = None
     return v, p
 
+
 def nn_infer(game, **kwargs):
     policy = kwargs["policy"]
     input = (
-        torch.tensor(
-        game.state * game.player,
-        dtype=torch.float,
-        device=device
-        )
-        .unsqueeze(0).unsqueeze(0)
-        )
+        torch.tensor(game.state * game.player, dtype=torch.float, device=device)
+        .unsqueeze(0)
+        .unsqueeze(0)
+    )
     v, p = policy.forward_batch(input, dim_value=0)
     v = float(v.squeeze().squeeze())
     return v, p

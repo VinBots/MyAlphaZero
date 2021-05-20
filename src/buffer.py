@@ -1,15 +1,23 @@
-"""
-This module implements a centralized replay buffer.
-"""
+######################################################
+#
+# AlphaZero algorithm applied to Tic-Tac-Toe
+# written by Vincent Manier (vmanier2020@gmail.com)
+#
+# This module implements a centralized replay buffer
+# based on a dictionary (self.memory). It also includes
+# a function to deduplicate similar positions.
+#
+######################################################
+
 
 # Import libraries
 import random
-from collections import namedtuple, deque
+from collections import namedtuple
 import torch
-import numpy as np
 
-#device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 device = "cpu"
+
 
 class ReplayBuffer:
     """Fixed-size buffer to store experience tuples."""
@@ -29,7 +37,7 @@ class ReplayBuffer:
         self.all_fields_names = ["v", "p", "count_exp"]
         self.record_length = len(self.all_fields_names)
         self.experience = namedtuple("Experience", field_names=self.all_fields_names)
-        #self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        # self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.device = "cpu"
         self.save_keys_list = []
         self.add_counter = 0
