@@ -1,3 +1,5 @@
+
+
 import numpy as np
 import random
 import torch
@@ -9,10 +11,10 @@ import pickle
 
 from tqdm import trange
 import mcts
-import games_mod
+import games
 from log_data import LogData
 from competition import match_net_mcts, net_player, mcts_player
-# Implementation 2 for comapring network performances - see net_compet
+# Implementation 2 for comparing network performances - see net_compet
 # from competition import match_ai, policy_player_mcts 
 import policy_mod
 from oracles import roll_out, nn_infer
@@ -30,7 +32,7 @@ def execute_self_play(
     Returns a list of experiences in a list [state, value, probability]
     """
     memory = []
-    mytree = mcts.Node(games_mod.ConnectN(game_settings), oracle = nn_infer)
+    mytree = mcts.Node(games.ConnectN(game_settings), oracle = nn_infer)
     orac_params = {"policy":policy}
 
     while mytree.outcome is None:
@@ -56,21 +58,11 @@ class AlphaZeroTraining:
 
     def __init__(
         self,
-        game_settings,
-        game_training_settings,
-        mcts_settings,
-        nn_training_settings,
-        benchmark_competition_settings,
-        play_settings,
+        config,
         policy,
         log_data,
     ):
-        self.game_settings = game_settings
-        self.game_training_settings = game_training_settings
-        self.mcts_settings = mcts_settings
-        self.nn_training_settings = nn_training_settings
-        self.benchmark_competition_settings = benchmark_competition_settings
-        self.play_settings = play_settings
+        self.config = config
         self.policy = policy
         self.log_data = log_data
         
@@ -86,18 +78,17 @@ class AlphaZeroTraining:
          - competition against old network
         """
 
-        generations = self.game_training_settings.generations
-        self_play_iterations = self.game_training_settings.self_play_iterations
-        data_augmentation_times = self.game_training_settings.data_augmentation_times
-        batch_size = self.nn_training_settings.batch_size
+        generations = self.config.game_training_settings.generations
+        self_play_iterations = self.config.game_training_settings.self_play_iterations
+        data_augmentation_times = self.config.game_training_settings.data_augmentation_times
+        batch_size = self.config.nn_training_settings.batch_size
         temp_policy = policy_mod.Policy(
-            self.temp_policy_path, 
-            self.nn_training_settings, 
+            self.config, 
             self.log_data
             )
         temp_policy.save_weights()
-        net_compet_threshold = self.benchmark_competition_settings.net_compet_threshold
-        compet_freq = self.benchmark_competition_settings.compet_freq
+        net_compet_threshold = self.config.benchmark_competition_settings.net_compet_threshold
+        compet_freq = self.config.benchmark_competition_settings.compet_freq
 
 
         for gen in range(generations): #trange(generations, desc = 'Generations'):
@@ -110,8 +101,8 @@ class AlphaZeroTraining:
             with multiprocessing.Pool (processes=num_processes) as pool:
                 self_play = [pool.apply_async(execute_self_play,
                 args = (
-                    self.game_settings,
-                    self.mcts_settings,
+                    self.config.game_settings,
+                    self.config.mcts_settings,
                     self.policy)) for _ in range(self_play_iterations)]
                 new_exp_res = [res.get() for res in self_play]
             #start = time.perf_counter()
@@ -154,8 +145,8 @@ class AlphaZeroTraining:
         always play the same positions.
         """
 
-        compet_freq = self.benchmark_competition_settings.compet_freq
-        compet_rounds = self.benchmark_competition_settings.compet_rounds
+        compet_freq = self.config.benchmark_competition_settings.compet_freq
+        compet_rounds = self.config.benchmark_competition_settings.compet_rounds
         reversed = False
 
         if compet_freq != 0 and (gen + 1) % compet_freq == 0:
@@ -174,7 +165,7 @@ class AlphaZeroTraining:
             '''
             scores = 0
             p1_params = {"policy_path": self.temp_policy_path, "nn_training_settings": self.nn_training_settings}
-            p2_params = {"policy_path": self.nn_training_settings.policy_path, "nn_training_settings": self.nn_training_settings}
+            p2_params = {"policy_path": self.config.nn_training_settings.policy_path, "nn_training_settings": self.nn_training_settings}
 
             for round_n in range(compet_rounds):
                 if round_n > compet_rounds / 2 -1 :
@@ -194,11 +185,13 @@ class AlphaZeroTraining:
         Measures the performance of the network against a plain MCTS
         """
 
-        benchmark_freq = self.benchmark_competition_settings.benchmark_freq
-        benchmark_rounds = self.benchmark_competition_settings.benchmark_rounds
+        benchmark_freq = self.config.benchmark_competition_settings.benchmark_freq
+        benchmark_rounds = self.config.benchmark_competition_settings.benchmark_rounds
+        full_path = self.config.nn_training_settings.ckp_folder + "/" + self.temp_policy_path
+
 
         reversed = False
-        p1_params = {"policy_path": self.temp_policy_path, "nn_training_settings": self.nn_training_settings}
+        p1_params = {"policy_path": full_path}
         p2_params = {}
 
         if benchmark_freq != 0 and (gen + 1) % benchmark_freq == 0:            
@@ -209,8 +202,10 @@ class AlphaZeroTraining:
                         reversed = True
                     match_params = {"player1": [net_player, p1_params], "player2": [mcts_player, p2_params], "inverse_order": reversed}
                     jobs.append(pool.apply_async(
-                        match_net_mcts, (self.game_settings, 
-                            self.benchmark_competition_settings, match_params)))
+                        match_net_mcts, (self.config.game_settings, 
+                        self.config.benchmark_competition_settings, 
+                        match_params)))
+
                 all_jobs = [job.get() for job in jobs]
             return np.array(all_jobs).sum() / benchmark_rounds
 

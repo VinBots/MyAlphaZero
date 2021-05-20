@@ -40,7 +40,7 @@ nn_training_settings = DotDict({
 # In this case the trained network replaces the current network at every generation
 
 benchmark_competition_settings = DotDict({
-    "compet_freq":0,
+    "compet_freq": 0,
     "compet_rounds": 2,
     "net_compet_threshold": 0.0,
     "benchmark_freq": 5,

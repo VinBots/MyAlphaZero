@@ -7,10 +7,13 @@ import matplotlib.pyplot as plt
 
 
 class Policy(nn.Module):
-    def __init__(self, path, nn_training_settings=None, log_data=None):
+    def __init__(self, config = None, log_data=None):
         super(Policy, self).__init__()
-        self.path = path
-        self.nn_training_settings = nn_training_settings
+        #self.config = config
+        if config is not None:
+            self.nn_training_settings = config.nn_training_settings
+            self.path = config.nn_training_settings.policy_path
+
         self.log_data = log_data
 
         torch.set_default_dtype(torch.float32)
@@ -153,11 +156,10 @@ class Policy(nn.Module):
         full_path = self.nn_training_settings.ckp_folder + "/" + self.path
         torch.save(self.state_dict(), full_path)
 
-    def load_weights(self, path):
+    def load_weights(self, full_path):
         """
         Loads weights of the network saved in path
         """
-        full_path = self.nn_training_settings.ckp_folder + "/" + path
         self.load_state_dict(torch.load(full_path))
 
     def legal_actions_mask(self, x):

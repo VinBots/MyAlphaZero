@@ -4,7 +4,7 @@ from copy import copy
 import torch
 import numpy as np
 
-import games_mod  # Games
+import games  # Games
 import mcts
 import policy_mod  # neural network
 from oracles import roll_out
@@ -17,11 +17,11 @@ def play_mcts(agent, iterations):
     next_pos, (_, _, p) = agent.next(temperature=0.01)
     return next_pos.game.last_move
 
-def network_only(game_state, policy_path, nn_training_settings):
+def network_only(game_state, policy_path):
     """
     Returns the best move (highest probability) output by the network
     """
-    policy = policy_mod.Policy(policy_path, nn_training_settings)
+    policy = policy_mod.Policy()
     policy.load_weights(policy_path)
     board = torch.tensor(game_state).type(torch.FloatTensor).unsqueeze(0).unsqueeze(0)
     v, prob = policy.forward_batch(board)
@@ -31,8 +31,7 @@ def network_only(game_state, policy_path, nn_training_settings):
 
 def net_player (game, **kwargs):
     policy_path = kwargs["params"]["policy_path"]
-    nn_training_settings = kwargs["params"]["nn_training_settings"]
-    return network_only(game.player * game.state, policy_path, nn_training_settings)
+    return network_only(game.player * game.state, policy_path)
 
 def mcts_player(game, **kwargs):
     turn = kwargs["turn"]
@@ -57,7 +56,7 @@ def match_net_mcts(game_settings, benchmark_competition_settings, match_params):
     inv_score = 1
     if inverse_order:
         inv_score = -1
-    new_game = games_mod.ConnectN(game_settings)
+    new_game = games.ConnectN(game_settings)
     players = [player1, player2]
     if inverse_order:
         players.reverse()
@@ -73,7 +72,6 @@ def match_net_mcts(game_settings, benchmark_competition_settings, match_params):
         new_game.move(next_move)
         turn += 1
     scores = inv_score * new_game.score + 1
-    #arr[round_n] = scores
     return scores
 '''
 def policy_player_mcts(game, play_settings=None, policy_path="ckp/ai_ckp.pth"):
