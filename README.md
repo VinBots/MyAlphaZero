@@ -22,7 +22,7 @@
   <br>
   <a href="https://github.com/VinBots/MyAlphaZero"><img src="docs/assets/charts/compet_chart-base_case.png" alt="AlphaZero"></a>
 </h1>
-<h5 align="center">Network-only performance against an almost perfect player (benchamrk means 100% draws)</h2>
+<h5 align="center">Network-only performance against an almost perfect player (benchmark means 100% draws)</h2>
 
 ## About
 
