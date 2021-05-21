@@ -2,7 +2,7 @@
 
 <h1 align="center">
   <br>
-  <a href="https://github.com/VinBots/MyAlphaZero"><img src="docs/assets/logo_alpha_zero.jpg" alt="AlphaZero"></a>
+  <a href="https://github.com/VinBots/MyAlphaZero"><img src="docs/assets/logo_alpha_zero1.jpg" alt="AlphaZero"></a>
 </h1>
 
 <h4 align="center">AlphaZero algorithm applied to Tic-Tac-Toe game</h4>
