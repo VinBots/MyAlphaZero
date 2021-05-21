@@ -1,4 +1,16 @@
-import numpy as np
+######################################################
+#
+# AlphaZero algorithm applied to Tic-Tac-Toe
+# written by Vincent Manier (vmanier2020@gmail.com)
+#
+# Neural network module is a simple convolutional
+# neural network that outputs for a given state
+# a state value and a probability distribution
+# for each possible action
+#
+######################################################
+
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -7,10 +19,13 @@ import matplotlib.pyplot as plt
 
 
 class Policy(nn.Module):
-    def __init__(self, path, nn_training_settings=None, log_data=None):
+    def __init__(self, path = "ai_ckp.pth", config=None, log_data=None):
         super(Policy, self).__init__()
+        # self.config = config
+        if config is not None:
+            self.nn_training_settings = config.nn_training_settings
         self.path = path
-        self.nn_training_settings = nn_training_settings
+
         self.log_data = log_data
 
         torch.set_default_dtype(torch.float32)
@@ -153,11 +168,10 @@ class Policy(nn.Module):
         full_path = self.nn_training_settings.ckp_folder + "/" + self.path
         torch.save(self.state_dict(), full_path)
 
-    def load_weights(self, path):
+    def load_weights(self, full_path):
         """
         Loads weights of the network saved in path
         """
-        full_path = self.nn_training_settings.ckp_folder + "/" + path
         self.load_state_dict(torch.load(full_path))
 
     def legal_actions_mask(self, x):

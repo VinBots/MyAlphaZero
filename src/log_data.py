@@ -1,3 +1,13 @@
+######################################################
+#
+# AlphaZero algorithm applied to Tic-Tac-Toe
+# written by Vincent Manier (vmanier2020@gmail.com)
+#
+# Module to log data to CSV files
+#
+######################################################
+
+
 import csv
 
 
@@ -61,7 +71,7 @@ class LogData:
         min_grads = []
         biases = []
         for n, p in named_parameters:
-            if (p.requires_grad):
+            if p.requires_grad:
                 if "fc_action2.bias" in n:
                     self.save_data("bias_action", iter_number, p.tolist())
                 else:
@@ -75,4 +85,3 @@ class LogData:
             csv_writer = csv.DictWriter(csv_file, fieldnames=self.fieldnames_grads)
             info = {k: v for (k, v) in zip(self.fieldnames_grads, stored_values)}
             csv_writer.writerow(info)
-    

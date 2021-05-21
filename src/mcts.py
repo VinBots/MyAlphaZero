@@ -1,13 +1,24 @@
+######################################################
+#
+# MCTS logic provided by Udacity
+# https://github.com/udacity/deep-reinforcement-learning
+#
+# Additions and modifications include ditichlet noise,
+# introduction of an oracle function that enables the
+# MCTS to use a roll-out or the network
+#
+######################################################
+
+
 from copy import copy
 from math import *
 import random
-import time
 
-import numpy as np
 import torch
 
-#device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 device = "cpu"
+
 
 class Node:
     """
@@ -20,12 +31,14 @@ class Node:
     create_child() creates self.child by iterating over possible actions from a given node
     """
 
-    def __init__(self, game, oracle = None, mother=None, prob=torch.tensor(0.0, dtype=torch.float)):
+    def __init__(
+        self, game, oracle=None, mother=None, prob=torch.tensor(0.0, dtype=torch.float)
+    ):
         self.game = game
         self.oracle = oracle
         self.mother = mother
         self.prob = prob
- 
+
         self.child = {}
         self.U = 0
         self.U_sa = 0
@@ -43,7 +56,6 @@ class Node:
             self.V = self.game.score * self.game.player
             self.U = 0 if self.game.score is 0 else self.V * float("inf")
         # link to previous node
-        
 
     def create_child(self, actions, probs):
         """
@@ -55,13 +67,21 @@ class Node:
             game.move(action)
 
         if probs is not None:
-            child = {tuple(a): Node(g, oracle = self.oracle, mother = self, prob = p) for a, g, p in zip(actions, games, probs)}
+            child = {
+                tuple(a): Node(g, oracle=self.oracle, mother=self, prob=p)
+                for a, g, p in zip(actions, games, probs)
+            }
         else:
-            child = {tuple(a): Node(g, oracle = self.oracle, mother = self) for a, g in zip(actions, games)}
+            child = {
+                tuple(a): Node(g, oracle=self.oracle, mother=self)
+                for a, g in zip(actions, games)
+            }
 
         self.child = child
 
-    def explore(self, orac_params, dir_eps = 0.25, dir_alpha = 2.0, dirichlet_enabled=False):
+    def explore(
+        self, orac_params, dir_eps=0.25, dir_alpha=2.0, dirichlet_enabled=False
+    ):
         """
         Implements the expansion, simulation and backpropagation steps
         This method should be further split
@@ -103,7 +123,7 @@ class Node:
             current.V = -v
 
             if probs is not None:
-                mask = torch.tensor(current.game.available_mask(), dtype = torch.bool)
+                mask = torch.tensor(current.game.available_mask(), dtype=torch.bool)
                 probs = self.normalize(probs.view(3, 3)[mask].view(-1))
                 if dirichlet_enabled and not current.mother:
                     probs = self.dirichlet_noise(probs, dir_eps, dir_alpha)
@@ -128,7 +148,9 @@ class Node:
                     else:
                         prior = 1
 
-                    sibling.U = sibling.V + self.c_puct * prior * sqrt(mother.N) / (1 + sibling.N)
+                    sibling.U = sibling.V + self.c_puct * prior * sqrt(mother.N) / (
+                        1 + sibling.N
+                    )
             current = current.mother
 
     def next(self, temperature=1.0):
@@ -155,8 +177,6 @@ class Node:
         else:
             # use max for numerical stability
             totalN = max(node.N for node in child.values()) + 1
-
-            # totalN = sum(node.N for node in child.values()) + 1
             prob = torch.tensor(
                 [(node.N / totalN) for node in child.values()],
                 device=device,
@@ -166,7 +186,7 @@ class Node:
                 device=device,
             )
         prob = self.normalize(prob)
-        prob_choice = self.normalize(prob_choice)        
+        prob_choice = self.normalize(prob_choice)
         nextstate = random.choices(list(child.values()), weights=prob_choice)[0]
         prob = self.game.unmask(prob)
 

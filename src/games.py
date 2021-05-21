@@ -1,11 +1,19 @@
+######################################################
+#
+# Tic-Tac-Toe Game provided by Udacity
+# https://github.com/udacity/deep-reinforcement-learning
+#
+######################################################
+
 import numpy as np
 import torch
 
 # output the index of when v has a continuous string of i
 # get_runs([0,0,1,1,1,0,0],1) gives [2],[5],[3]
 
-#device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 device = "cpu"
+
 
 def get_runs(v, i):
     bounded = np.hstack(([0], (v == i).astype(int), [0]))
@@ -92,7 +100,7 @@ class ConnectN:
         self.player = 1
         self.last_move = None
         self.n_moves = 0
-        
+
         # self.switched_side = False
 
     # fast deepcopy

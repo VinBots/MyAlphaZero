@@ -6,3 +6,5 @@ __pycache__/
 old
 testing
 playground
+requirements.in
+.vscode
