@@ -18,6 +18,12 @@
 
 ---
 
+<h1 align="center">
+  <br>
+  <a href="https://github.com/VinBots/MyAlphaZero"><img src="docs/assets/charts/compet_chart-base_case.png" alt="AlphaZero"></a>
+</h1>
+<h5 align="center">Network-only performance against an almost perfect player (benchamrk means 100% draws)</h2>
+
 ## About
 
 This repository includes an implementation of AlphaZero algorithm applied to the TicTacToe game, based on Deepmind's paper, Mastering the game of Go without human knowledge, published in October 2017.
