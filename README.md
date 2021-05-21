@@ -10,12 +10,13 @@
   <a href="#about">About</a> •
   <a href="#learning">Learning</a> •
   <a href="#installation">Installation</a> •
+  <a href="#configuration">Configuration</a> •
   <a href="#references">References</a> •
-  <a href="#credits">Credits</a>
+  <a href="#credits">Credits</a> •
+  <a href="#going further">Going Further</a>
 </p>
 
 ---
-
 
 ## About
 
@@ -31,30 +32,34 @@ This repository includes an implementation of AlphaZero algorithm applied to the
 
 ## Installation
 
-1. Clone the repository
+**1. Clone the repository**
 
 ```
 git clone https://github.com/VinBots/MyAlphaZero.git
 ```
 
-2. Create and activate a new virtual environment via conda
+**2. Create and activate a new virtual environment via conda**
 
 ```
 conda create --name new_env python=3.6.13
 conda activate new_env
 ```
 
-3. Install the required packages
+**3. Install the required packages**
 
 Go to the root directory and install the dependencies
 ```
 cd MyAlphaZero
 pip install -r requirements.txt
 ```
-1. Run the algorithm
+**4. Run the algorithm**
 ```
-python main.py
+python src/main.py
 ```
+
+## Configuration
+
+All the parameters are located in `src/config.py`
 
 ## References
 
@@ -67,4 +72,8 @@ python main.py
 * Udacity Deep Reinforcement Learning Nanodegree (https://github.com/udacity/deep-reinforcement-learning)
 
 
+## Going Further
 
+* Asynchronous MCTS
+* Larger games (Connect Four, Chess...)
+* Training optimization (GPU usage)
