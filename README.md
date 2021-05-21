@@ -13,7 +13,7 @@
   <a href="#configuration">Configuration</a> •
   <a href="#references">References</a> •
   <a href="#credits">Credits</a> •
-  <a href="#going further">Going Further</a>
+  <a href="#going-further">Going Further</a>
 </p>
 
 ---
